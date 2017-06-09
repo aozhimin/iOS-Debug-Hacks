@@ -1,2 +1,95 @@
-# iOS-Debug
-iOS 项目开发过程中用到的高级调试技巧，涉及三方库动态调试、静态分析和反编译等领域
+## 背景
+
+在做登录 SDK 开发的过程中，产线接到用户反馈，在点击登录页面的 QQ 图标的时候出现应用闪退的情况，试图重现的过程中发现是在用户手机未安装 QQ 的情况下，使用 QQ 登录的时候回去拉起 QQ Web 授权页，但此时会出现 `[TCWebViewController setRequestURLStr:]` 找不到 selector 的情况。
+
+> 注意：为了更好的讲解，下面所有涉及到具体业务，与本主题无关的地方没有列出来，同时应用名称用 **AADebug** 代替。
+
+应用崩溃的堆栈信息如下：
+
+```
+Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: '-[TCWebViewController setRequestURLStr:]: unrecognized selector sent to instance 0x7fe25bd84f90'
+*** First throw call stack:
+(
+	0   CoreFoundation                      0x0000000112ce4f65 __exceptionPreprocess + 165
+	1   libobjc.A.dylib                     0x00000001125f7deb objc_exception_throw + 48
+	2   CoreFoundation                      0x0000000112ced58d -[NSObject(NSObject) doesNotRecognizeSelector:] + 205
+	3   AADebug                             0x0000000108cffefc __ASPECTS_ARE_BEING_CALLED__ + 6172
+	4   CoreFoundation                      0x0000000112c3ad97 ___forwarding___ + 487
+	5   CoreFoundation                      0x0000000112c3ab28 _CF_forwarding_prep_0 + 120
+	6   AADebug                             0x000000010a663100 -[TCWebViewKit open] + 387
+	7   AADebug                             0x000000010a6608d0 -[TCLoginViewKit loadReqURL:webTitle:delegate:] + 175
+	8   AADebug                             0x000000010a660810 -[TCLoginViewKit openWithExtraParams:] + 729
+	9   AADebug                             0x000000010a66c45e -[TencentOAuth authorizeWithTencentAppAuthInSafari:permissions:andExtraParams:delegate:] + 701
+	10  AADebug                             0x000000010a66d433 -[TencentOAuth authorizeWithPermissions:andExtraParams:delegate:inSafari:] + 564
+………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………
+
+省略若干无关行	
+
+………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………
+236
+	14  libdispatch.dylib                   0x0000000113e28ef9 _dispatch_call_block_and_release + 12
+	15  libdispatch.dylib                   0x0000000113e4949b _dispatch_client_callout + 8
+	16  libdispatch.dylib                   0x0000000113e3134b _dispatch_main_queue_callback_4CF + 1738
+	17  CoreFoundation                      0x0000000112c453e9 __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 9
+	18  CoreFoundation                      0x0000000112c06939 __CFRunLoopRun + 2073
+	19  CoreFoundation                      0x0000000112c05e98 CFRunLoopRunSpecific + 488
+	20  GraphicsServices                    0x0000000114a13ad2 GSEventRunModal + 161
+	21  UIKit                               0x0000000110d3f676 UIApplicationMain + 171
+	22  CCTalk                              0x0000000108596d3f main + 111
+	23  libdyld.dylib                       0x0000000113e7d92d start + 1
+)
+libc++abi.dylib: terminating with uncaught exception of type NSException
+```
+
+## 排查过程
+
+根据上面出错信息中的 `TCWebViewController` 很自然想到与腾讯的 SDK **TencentOpenAPI.framework** 有关，但是产线的应用出现问题的时间段内没有更新腾讯的 SDK，所以应该不是直接由 **TencentOpenAPI.framework** 导致应用崩溃的。
+
+首先通过反编译工具拿到 `TCWebViewController` 类的结构
+
+```
+  ; @class TCWebViewController : UIViewController<UIWebViewDelegate, NSURLConnectionDelegate, NSURLConnectionDataDelegate> {
+                                       ;     @property webview
+                                       ;     @property webTitle
+                                       ;     @property requestURLStr
+                                       ;     @property error
+                                       ;     @property delegate
+                                       ;     @property activityIndicatorView
+                                       ;     @property finished
+                                       ;     @property theData
+                                       ;     @property retryCount
+                                       ;     @property hash
+                                       ;     @property superclass
+                                       ;     @property description
+                                       ;     @property debugDescription
+                                       ;     ivar _nloadCount
+                                       ;     ivar _webview
+                                       ;     ivar _webTitle
+                                       ;     ivar _requestURLStr
+                                       ;     ivar _error
+                                       ;     ivar _delegate
+                                       ;     ivar _xo
+                                       ;     ivar _activityIndicatorView
+                                       ;     ivar _finished
+                                       ;     ivar _theData
+                                       ;     ivar _retryCount
+                                       ;     -setError:
+                                       ;     -initWithNibName:bundle:
+                                       ;     -dealloc
+                                       ;     -stopLoad
+                                       ;     -doClose
+                                       ;     -viewDidLoad
+                                       ;     -loadReqURL
+                                       ;     -viewDidDisappear:
+                                       ;     -shouldAutorotateToInterfaceOrientation:
+                                       ;     -supportedInterfaceOrientations
+                                       ;     -shouldAutorotate
+                                       ;     -webViewDidStartLoad:
+                                       ;     -webViewDidFinishLoad:
+                                       ;     -webView:didFailLoadWithError:
+                                       ;     -webView:shouldStartLoadWithRequest:navigationType:
+                                       ; }
+                     _OBJC_CLASS_$_TCWebViewController:
+```
+
+静态分析的结果发现 `TCWebViewController` 类中确实没有 `requestURLStr` 的 Setter 和 Getter，因为之前版本没有出现崩溃，所以不难想到 `requestURLStr` 的 Setter 和 Getter 一定是在 **Runtime** 的时候新增的，按照这条线索继续查下去，发现在 **TencentOpenAPI.framework** 中
