@@ -8,7 +8,7 @@
 
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
 
-从 **Cobol** 语言的创始人 Grace Hopper 在继电器式计算机发现世界上第一个 Bug 开始，软件开发中 Bug 的产生就从未停止过，正如《Advanced Apple Debugging & Reverse Engineering》一书前言所述：开发者不要妄图认为如果能充分了解软件的工作方式，就不会存在 Bug，事实上，任何软件中都存在 Bug。
+从 **Cobol** 语言的创始人 Grace Hopper 在继电器式计算机发现世界上第一个 Bug 开始，软件开发中 Bug 的产生就从未停止过，正如《Advanced Apple Debugging & Reverse Engineering》一书前言所述：开发者不要妄图认为如果能充分了解软件的工作方式，就不会存在 Bug，事实上，任何软件中都存在 Bug。所以在软件开发周期中，Debugging 几乎是一个无法避免的环节。
 
 ## 调试概述
 
@@ -27,9 +27,20 @@
 
 这些年来，调试器在不断在发展，也彻底改变了程序员们的编程方式。当然调试器无法代替良好的思维，思维也无法替代优秀的调试器，最完美的组合就是优秀的调试器加上良好的思维。
 
+下图是《调试九法:软硬件错误的排查之道》一书提及的九大调试规则。
+<p align="center">
+
+<img src="Images/debug_rules.jpeg" width="500" />
+
+</p>
+
 ## 案例
 
-在做登录 SDK 开发的过程中，产线接到用户反馈，在点击登录页面的 QQ 图标的时候出现应用闪退的情况，试图重现的过程中发现是在用户手机未安装 QQ 的情况下，使用 QQ 登录的时候回去拉起 QQ Web 授权页，但此时会出现 `[TCWebViewController setRequestURLStr:]` 找不到 selector 的情况。
+文章通过一个真实的“案例故事”来描述调试过程，有些细节被我改动了，以便保护个人隐私。
+
+### 问题
+
+故事发生我在做登录 SDK 开发的过程中，产线接到用户反馈，在点击登录页面的 QQ 图标的时候出现应用闪退的情况，试图重现的过程中发现是在用户手机未安装 QQ 的情况下，使用 QQ 登录的时候回去拉起 QQ Web 授权页，但此时会出现 `[TCWebViewController setRequestURLStr:]` 找不到 selector 的情况。
 
 > 注意：为了更好的讲解，下面所有涉及到具体业务，与本主题无关的地方没有列出来，同时应用名称用 **AADebug** 代替。
 
@@ -70,7 +81,7 @@ Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: 
 libc++abi.dylib: terminating with uncaught exception of type NSException
 ```
 
-## 排查过程
+### 调试过程
 
 根据上面出错信息中的 `TCWebViewController` 很自然想到与腾讯的 SDK **TencentOpenAPI.framework** 有关，但是产线的应用出现问题的时间段内没有更新腾讯的 SDK，所以应该不是直接由 **TencentOpenAPI.framework** 导致应用崩溃的。
 
