@@ -1,4 +1,4 @@
-## 背景
+## 序言
 
 <p align="center">
 
@@ -9,7 +9,25 @@
 
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
 
-正如《Advanced Apple Debugging & Reverse Engineering》一书前言所述：开发者不要妄图认为如果能充分了解软件的工作方式，就不会存在 Bug，事实上，任何软件中都存在 Bug。
+从 **Cobol** 语言的创始人 Grace Hopper 在继电器式计算机发现世界上第一个 Bug 开始，软件开发中 Bug 的产生就从未停止过，正如《Advanced Apple Debugging & Reverse Engineering》一书前言所述：开发者不要妄图认为如果能充分了解软件的工作方式，就不会存在 Bug，事实上，任何软件中都存在 Bug。
+
+## 调试是什么
+
+
+如果你问一个经验不丰富的程序该如何定义调试，他也许会回答你调试就是找出解决问题的方案。事实上，这只是调试中目标的一小部分，设置都不算是最终要的一部分。
+有效的调试需要如下步骤：
+
+1. 找出为什么软件没有按照期望的行为运行
+2. 解决问题
+3. 避免引发其他问题
+4. 提升代码的整体质量，包括可读性、架构、测试覆盖率、性能等方面
+5. 确保类似问题不会再其他地方再次出现
+
+在上面步骤中，最重要是第一步——找出导致问题的根源，这是后面其他步骤的先决条件。
+
+100个程序员就有100种调试的方法，这些方法被内化到程序的思维中，等遇到问题时会被激活出来，然而却没被详细记录在文档中。事实上，经验丰富的程序员往往具备更高明的调试技巧，也能更快的定位和解决问题。
+
+## 案例
 
 在做登录 SDK 开发的过程中，产线接到用户反馈，在点击登录页面的 QQ 图标的时候出现应用闪退的情况，试图重现的过程中发现是在用户手机未安装 QQ 的情况下，使用 QQ 登录的时候回去拉起 QQ Web 授权页，但此时会出现 `[TCWebViewController setRequestURLStr:]` 找不到 selector 的情况。
 
