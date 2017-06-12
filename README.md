@@ -2,7 +2,7 @@
 
 <p align="center">
 
-<img src="images/logo.jpeg" alt="Debug" title="Debug"/>
+<img src="Images/logo.jpeg" alt="Debug" title="Debug"/>
 
 </p>
 
@@ -122,7 +122,7 @@ void +[NSObject switchMethodForCodeZipper](void * self, void * _cmd) {
 }
 ```
 
-于是将实现转移到 `QQmethodSignatureForSelector` 中，发现在其中有个方法：`_AddDynamicPropertysSetterAndGetter`，从方法名称很容易知道这个方法是动态地给属性添加 Setter 和 Getter 方法。基本验证了 `TCWebViewController` 类中的 Property 的 Setter 和 Getter 方法是在 Runtime 动态添加。
+于是将视线转移到 `QQmethodSignatureForSelector` 中，发现在其中有个方法：`_AddDynamicPropertysSetterAndGetter`，从方法名称很容易知道这个方法是动态地给属性添加 Setter 和 Getter 方法。基本验证了 `TCWebViewController` 类中的 Property 的 Setter 和 Getter 方法是在 Runtime 动态添加。
 
 ```objective-c
 void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void * arg2) {
@@ -140,6 +140,47 @@ void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void 
     return rax;
 }
 ```
+
+那究竟为什么 `TCWebViewController` 找不到 Setter 的 Selector 呢？是否在开发新版本的过程覆盖了 `QQmethodSignatureForSelector` 导致的呢？然而在搜遍项目的所有角落，并没有发现项目中替换有 `NSObject` 的 `methodSignatureForSelector`，问题有点棘手，分析到这一步，静态分析暂时告一段落，下一步将使用 LLDB 来动态调试腾讯的三方库，从而找出是哪一个环节破坏了消息转发过程中动态生成 Getter 和 Setter。
+
+> 这里其实如果通过 LLDB 命令给 `setRequestURLStr` 方法打断点，会发现不能成功打上这个断点，原因也是因为 Setter 方法其实在编译时还没有，也能作为上面猜想的佐证。
+
+根据崩溃堆栈中可以推测出 `setRequestURLStr` 是在 `-[TCWebViewKit open]` 方法中调用的，也就是腾讯的 SDK 发现没有安装 QQ 时，会打开 QQ 的 Web 授权页。
+
+我们使用 LLDB 在这个方法下断点，命令如下：
+
+```
+br s -n "-[TCWebViewKit open]"
+```
+断点成功打上。
+
+```
+Breakpoint 34: where = AADebug`-[TCWebViewKit open], address = 0x0000000103157f7d
+```
+
+当应用准备跳到 Web 授权页的时候，断点会被断住，会看到下图
+
+<p align="center">
+
+<img src="Images/lldb_webviewkit_open.png" />
+
+</p>
+
+在下图 96 行的汇编代码打一个断点，这条汇编代码就是调用 `setRequestURLStr` 方法，然后打印出 `rbx` 寄存器的内容，可以观察到 `rbx` 保存的就是 `TCWebViewController` 实例。
+
+<p align="center">
+
+<img src="Images/lldb_webviewkit_open_1.png" />
+
+</p>
+
+
+
+
+
+
+
+
 
 
 
