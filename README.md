@@ -96,4 +96,43 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
                      _OBJC_CLASS_$_TCWebViewController:
 ```
 
-静态分析的结果发现 `TCWebViewController` 类中确实没有 `requestURLStr` 的 Setter 和 Getter，因为之前版本没有出现崩溃，所以不难想到 `requestURLStr` 的 Setter 和 Getter 一定是在 **Runtime** 的时候新增的，按照这条线索继续查下去，发现在 **TencentOpenAPI.framework** 中
+静态分析的结果发现 `TCWebViewController` 类中确实没有 `requestURLStr` 的 Setter 和 Getter，因为之前版本没有出现崩溃。
+
+此时产生一个想法：`TCWebViewController` 类中的 Property 会不会像 **Core Data** 框架一样，使用 `@dynamic` 告诉编译器不做处理，然后 Getter 和 Setter 方法是在运行时动态创建。于是带着这个猜想继续查下去，发现在 **TencentOpenAPI.framework** 中有个 `NSObject` 的 Category：`NSObject(MethodSwizzlingCategory)` 非常可疑，其中 `switchMethodForCodeZipper:` 方法分别将消息转发过程中的 `methodSignatureForSelector` 和 `forwardInvocation`方法替换为 `QQmethodSignatureForSelector` 和 `QQforwardInvocation`。
+
+```objective-c
+void +[NSObject switchMethodForCodeZipper](void * self, void * _cmd) {
+    rbx = self;
+    objc_sync_enter(self);
+    if (*(int8_t *)_g_instance == 0x0) {
+            [NSObject swizzleMethod:@selector(methodSignatureForSelector:) withMethod:@selector(QQmethodSignatureForSelector:)];
+            [NSObject swizzleMethod:@selector(forwardInvocation:) withMethod:@selector(QQforwardInvocation:)];
+            *(int8_t *)_g_instance = 0x1;
+    }
+    rdi = rbx;
+    objc_sync_exit(rdi);
+    return;
+}
+```
+
+于是将实现转移到 `QQmethodSignatureForSelector` 中，发现在其中有个方法：`_AddDynamicPropertysSetterAndGetter`，从方法名称很容易知道这个方法是动态地给属性添加 Setter 和 Getter 方法。基本验证了 `TCWebViewController` 类中的 Property 的 Setter 和 Getter 方法是在 Runtime 动态添加。
+
+```objective-c
+void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void * arg2) {
+    r14 = arg2;
+    rbx = self;
+    rax = [self QQmethodSignatureForSelector:rdx];
+    if (rax == 0x0) {
+            rax = sel_getName(r14);
+            _AddDynamicPropertysSetterAndGetter();
+            rax = 0x0;
+            if (0x0 != 0x0) {
+                    rax = [rbx methodSignatureForSelector:r14];
+            }
+    }
+    return rax;
+}
+```
+
+
+
