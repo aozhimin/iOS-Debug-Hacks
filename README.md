@@ -8,7 +8,7 @@
 
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
 
-从 **Cobol** 语言的创始人 Grace Hopper 在继电器式计算机发现世界上第一个 Bug 开始，软件开发中 Bug 的产生就从未停止过，正如《Advanced Apple Debugging & Reverse Engineering》一书前言所述：开发者不要妄图认为如果能充分了解软件的工作方式，就不会存在 Bug，事实上，任何软件中都存在 Bug。所以在软件开发周期中，Debugging 几乎是一个无法避免的环节。
+从 **Cobol** 语言的创始人 Grace Hopper 在继电器式计算机中发现世界上第一个 Bug 开始，软件开发中 Bug 的产生就从未停止，正如《Advanced Apple Debugging & Reverse Engineering》一书前言所述：开发者不要妄图认为如果能充分了解软件的工作方式，就不会存在 Bug，事实上，任何软件中都存在 Bug。所以在软件开发周期中，Debugging 几乎是一个无法避免的环节。
 
 ## 调试概述
 
@@ -170,7 +170,7 @@ void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void 
 }
 ```
 
-那究竟为什么 `TCWebViewController` 找不到 Setter 的 Selector 呢？是否在开发新版本的过程覆盖了 `QQmethodSignatureForSelector` 导致的呢？然而在搜遍项目的所有角落，并没有发现项目中替换有 `NSObject` 的 `methodSignatureForSelector`，问题有点棘手，分析到这一步，静态分析暂时告一段落，下一步将使用 LLDB 来动态调试腾讯的三方库，从而找出是哪一个环节破坏了消息转发过程中动态生成 Getter 和 Setter。
+那究竟为什么 `TCWebViewController` 找不到 Setter 的 Selector 呢？是否在开发新版本的过程覆盖了 `QQMethodSignatureForSelector` 导致的呢？然而在搜遍项目的所有角落，并没有发现项目中替换有 `NSObject` 的 `methodSignatureForSelector`，问题有点棘手，分析到这一步，静态分析暂时告一段落，下一步将使用 LLDB 来动态调试腾讯的三方库，从而找出是哪一个环节破坏了消息转发过程中动态生成 Getter 和 Setter。
 
 > 这里其实如果通过 LLDB 命令给 `setRequestURLStr` 方法打断点，会发现不能成功打上这个断点，原因也是因为 Setter 方法其实在编译时还没有，也能作为上面猜想的佐证。
 
@@ -181,6 +181,7 @@ void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void 
 ```
 br s -n "-[TCWebViewKit open]"
 ```
+
 断点成功打上。
 
 ```
@@ -195,7 +196,7 @@ Breakpoint 34: where = AADebug`-[TCWebViewKit open], address = 0x0000000103157f7
 
 </p>
 
-在下图 96 行的汇编代码打一个断点，这条汇编代码就是调用 `setRequestURLStr` 方法，然后打印出 `rbx` 寄存器的内容，可以观察到 `rbx` 保存的就是 `TCWebViewController` 实例。
+在下图 96 行的汇编代码打一个断点，这条汇编代码就是调用 `setRequestURLStr` 方法，然后打印出 `rbx` 寄存器的内容，可以观察到 `rbx` 寄存器保存的就是 `TCWebViewController` 实例。
 
 <p align="center">
 
@@ -203,13 +204,226 @@ Breakpoint 34: where = AADebug`-[TCWebViewKit open], address = 0x0000000103157f7
 
 </p>
 
+#### methodSignatureForSelector
 
+接下来用 LLDB 给 `QQmethodSignatureForSelector` 方法下断点
 
+```
+br s -n "-[NSObject QQmethodSignatureForSelector:]"
+```
 
+LLDB 中输入 `c` 命令让端点继续执行，这个时候断点断在了 `QQmethodSignatureForSelector` 方法内部，所以推翻了 `QQmethodSignatureForSelector` 方法被我们项目替换的猜想。
+<p align="center">
 
+<img src="Images/lldb_method_signature.png" />
 
+</p>
 
+在 `QQmethodSignatureForSelector` 方法汇编代码的最后，也就是31行的 `retq` 指令处下一个断点，然后将寄存器 `rax` 存放的内存地址打印出来，如下图
 
+<p align="center">
 
+<img src="Images/lldb_method_signature_1.png" />
 
+</p>
+
+图中在方法返回的时候，将 `rax` 寄存器存放的内存地址 `0x00007fdb36d38df0` 打印出来的结果是一个 `NSMethodSignature` 对象，熟悉 X86 汇编语言调用约定的读者应该知道在 X86 汇编中，函数的返回值存放在 `rax` 寄存器中。结果表明腾讯的 `QQmethodSignatureForSelector` 方法正确被调用了，并且有返回值。所以排除了这一步出现问题。
+
+#### forwardInvocation
+
+使用 LLDB 给 `QQforwardInvocation` 方法下断点
+
+```
+br s -n "-[NSObject QQforwardInvocation:]"
+```
+
+断点成功添加后，继续运行后，此时应用会崩溃，没有执行 `QQforwardInvocation` 方法，所以基本能够断定是我们项目中覆盖了腾讯 Hook 的 `QQforwardInvocation` 方法。
+
+<p align="center">
+
+<img src="Images/lldb_method_signature_2.png" />
+
+</p>
+
+`___forwarding___` 函数包含了消息转发的完整实现，反编译后的代码如下：
+
+```
+int __forwarding__(void *frameStackPointer, int isStret) {
+  id receiver = *(id *)frameStackPointer;
+  SEL sel = *(SEL *)(frameStackPointer + 8);
+  const char *selName = sel_getName(sel);
+  Class receiverClass = object_getClass(receiver);
+
+  // 调用 forwardingTargetForSelector:
+  if (class_respondsToSelector(receiverClass, @selector(forwardingTargetForSelector:))) {
+    id forwardingTarget = [receiver forwardingTargetForSelector:sel];
+    if (forwardingTarget && forwarding != receiver) {
+    	if (isStret == 1) {
+    		int ret;
+    		objc_msgSend_stret(&ret,forwardingTarget, sel, ...);
+    		return ret;
+    	}
+      return objc_msgSend(forwardingTarget, sel, ...);
+    }
+  }
+
+  // 僵尸对象
+  const char *className = class_getName(receiverClass);
+  const char *zombiePrefix = "_NSZombie_";
+  size_t prefixLen = strlen(zombiePrefix); // 0xa
+  if (strncmp(className, zombiePrefix, prefixLen) == 0) {
+    CFLog(kCFLogLevelError,
+          @"*** -[%s %s]: message sent to deallocated instance %p",
+          className + prefixLen,
+          selName,
+          receiver);
+    <breakpoint-interrupt>
+  }
+
+  // 调用 methodSignatureForSelector 获取方法签名后再调用 forwardInvocation
+  if (class_respondsToSelector(receiverClass, @selector(methodSignatureForSelector:))) {
+    NSMethodSignature *methodSignature = [receiver methodSignatureForSelector:sel];
+    if (methodSignature) {
+      BOOL signatureIsStret = [methodSignature _frameDescriptor]->returnArgInfo.flags.isStruct;
+      if (signatureIsStret != isStret) {
+        CFLog(kCFLogLevelWarning ,
+              @"*** NSForwarding: warning: method signature and compiler disagree on struct-return-edness of '%s'.  Signature thinks it does%s return a struct, and compiler thinks it does%s.",
+              selName,
+              signatureIsStret ? "" : not,
+              isStret ? "" : not);
+      }
+      if (class_respondsToSelector(receiverClass, @selector(forwardInvocation:))) {
+        NSInvocation *invocation = [NSInvocation _invocationWithMethodSignature:methodSignature frame:frameStackPointer];
+
+        [receiver forwardInvocation:invocation];
+
+        void *returnValue = NULL;
+        [invocation getReturnValue:&value];
+        return returnValue;
+      } else {
+        CFLog(kCFLogLevelWarning ,
+              @"*** NSForwarding: warning: object %p of class '%s' does not implement forwardInvocation: -- dropping message",
+              receiver,
+              className);
+        return 0;
+      }
+    }
+  }
+
+  SEL *registeredSel = sel_getUid(selName);
+
+  // selector 是否已经在 Runtime 注册过
+  if (sel != registeredSel) {
+    CFLog(kCFLogLevelWarning ,
+          @"*** NSForwarding: warning: selector (%p) for message '%s' does not match selector known to Objective C runtime (%p)-- abort",
+          sel,
+          selName,
+          registeredSel);
+  } // doesNotRecognizeSelector
+  else if (class_respondsToSelector(receiverClass,@selector(doesNotRecognizeSelector:))) {
+    [receiver doesNotRecognizeSelector:sel];
+  } 
+  else {
+    CFLog(kCFLogLevelWarning ,
+          @"*** NSForwarding: warning: object %p of class '%s' does not implement doesNotRecognizeSelector: -- abort",
+          receiver,
+          className);
+  }
+
+  // The point of no return.
+  kill(getpid(), 9);
+}
+```
+
+概括如下：
+
+1. 先调用 `forwardingTargetForSelector` 方法获取新的 target 作为 receiver 重新执行 selector，如果返回的内容不合法（为 `nil` 或者跟旧 receiver 一样），那就进入第二步。
+2. 调用 `methodSignatureForSelector` 获取方法签名后，判断返回类型信息是否正确，再调用 `forwardInvocation` 执行 `NSInvocation` 对象，并将结果返回。如果对象没实现 `methodSignatureForSelector` 方法，进入第三步。
+3. 调用 `doesNotRecognizeSelector` 方法。
+
+观察我们项目中崩溃堆栈中的 `___forwarding___`，会发现他的执行路径是第二步，也就是调用了 `forwardInvocation` 执行 `NSInvocation` 对象。
+
+<p align="center">
+
+<img src="Images/___forwarding___.png" />
+
+</p>
+
+然而调用 `forwardInvocation` 方法究竟执行了哪个方法呢，从堆栈中我们可以看到 `__ASPECTS_ARE_BEING_CALLED__` 方法，这个是 `Aspects` 库 Hook `forwardInvocation` 的方法。
+
+```objective-c
+static void aspect_swizzleForwardInvocation(Class klass) {
+    NSCParameterAssert(klass);
+    // If there is no method, replace will act like class_addMethod.
+    IMP originalImplementation = class_replaceMethod(klass, @selector(forwardInvocation:), (IMP)__ASPECTS_ARE_BEING_CALLED__, "v@:@");
+    
+    if (originalImplementation) {
+        class_addMethod(klass, NSSelectorFromString(AspectsForwardInvocationSelectorName), originalImplementation, "v@:@");
+    }
+    AspectLog(@"Aspects: %@ is now aspect aware.", NSStringFromClass(klass));
+}
+```
+
+```objective-c
+// This is the swizzled forwardInvocation: method.
+static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL selector, NSInvocation *invocation) {
+    NSLog(@"selector:%@",  NSStringFromSelector(invocation.selector));
+    NSCParameterAssert(self);
+    NSCParameterAssert(invocation);
+    SEL originalSelector = invocation.selector;
+	SEL aliasSelector = aspect_aliasForSelector(invocation.selector);
+    invocation.selector = aliasSelector;
+    AspectsContainer *objectContainer = objc_getAssociatedObject(self, aliasSelector);
+    AspectsContainer *classContainer = aspect_getContainerForClass(object_getClass(self), aliasSelector);
+    AspectInfo *info = [[AspectInfo alloc] initWithInstance:self invocation:invocation];
+    NSArray *aspectsToRemove = nil;
+
+    // Before hooks.
+    aspect_invoke(classContainer.beforeAspects, info);
+    aspect_invoke(objectContainer.beforeAspects, info);
+
+    // Instead hooks.
+    BOOL respondsToAlias = YES;
+    if (objectContainer.insteadAspects.count || classContainer.insteadAspects.count) {
+        aspect_invoke(classContainer.insteadAspects, info);
+        aspect_invoke(objectContainer.insteadAspects, info);
+    }else {
+        Class klass = object_getClass(invocation.target);
+        do {
+            if ((respondsToAlias = [klass instancesRespondToSelector:aliasSelector])) {
+                [invocation invoke];
+                break;
+            }
+        }while (!respondsToAlias && (klass = class_getSuperclass(klass)));
+    }
+
+    // After hooks.
+    aspect_invoke(classContainer.afterAspects, info);
+    aspect_invoke(objectContainer.afterAspects, info);
+
+    // If no hooks are installed, call original implementation (usually to throw an exception)
+    if (!respondsToAlias) {
+        invocation.selector = originalSelector;
+        SEL originalForwardInvocationSEL = NSSelectorFromString(AspectsForwardInvocationSelectorName);
+        if ([self respondsToSelector:originalForwardInvocationSEL]) {
+            ((void( *)(id, SEL, NSInvocation *))objc_msgSend)(self, originalForwardInvocationSEL, invocation);
+        }else {
+            [self doesNotRecognizeSelector:invocation.selector];
+        }
+    }
+
+    // Remove any hooks that are queued for deregistration.
+    [aspectsToRemove makeObjectsPerformSelector:@selector(remove)];
+}
+```
+
+因为 `TCWebViewController` 是腾讯 SDK 中的私有类，猜想项目不大可能直接对其进行 Hook，很有可能是 Hook 了一个父类导致这个子类也受到影响，于是在项目中继续排查，找到了答案
+
+<p align="center">
+
+<img src="Images/answer.png" />
+
+</p>
+
+导致崩溃的原因就是使用 Aspects 库 Hook `UIViewController` 类的页面生命周期方法，Aspects 的 Hook 实现会替换掉 `forwardInvocation` 方法，由于 `TCWebViewController` 的父类是 `UIViewController`，所以也会被 Hook 住，`QQforwardInvocation` 方法被覆盖，导致消息转发失败，从而无法动态生成属性的 Setter 和 Getter 方法。将 Hook `UIViewController` 的部分删除或者注释，此时再去使用 QQ 登录，应用不再崩溃。
 
