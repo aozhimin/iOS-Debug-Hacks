@@ -75,7 +75,7 @@ Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: 
 	19  CoreFoundation                      0x0000000112c05e98 CFRunLoopRunSpecific + 488
 	20  GraphicsServices                    0x0000000114a13ad2 GSEventRunModal + 161
 	21  UIKit                               0x0000000110d3f676 UIApplicationMain + 171
-	22  CCTalk                              0x0000000108596d3f main + 111
+	22  AADebug                             0x0000000108596d3f main + 111
 	23  libdyld.dylib                       0x0000000113e7d92d start + 1
 )
 libc++abi.dylib: terminating with uncaught exception of type NSException
@@ -341,7 +341,17 @@ int __forwarding__(void *frameStackPointer, int isStret) {
 2. 调用 `methodSignatureForSelector` 获取方法签名后，判断返回类型信息是否正确，再调用 `forwardInvocation` 执行 `NSInvocation` 对象，并将结果返回。如果对象没实现 `methodSignatureForSelector` 方法，进入第三步。
 3. 调用 `doesNotRecognizeSelector` 方法。
 
+下面的流程图阐述了消息转发的流程
+
+<p align="center">
+
+<img src="Images/message_forward.jpg" />
+
+</p>
+
 观察我们项目中崩溃堆栈中的 `___forwarding___`，会发现他的执行路径是第二步，也就是调用了 `forwardInvocation` 执行 `NSInvocation` 对象。
+
+> 也可以在断点之后逐步执行命令，观察汇编代码的执行路径，得出结论与上面应该是一致的。
 
 <p align="center">
 
