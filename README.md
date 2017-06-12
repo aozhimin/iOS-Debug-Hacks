@@ -1,18 +1,16 @@
-## 序言
-
 <p align="center">
 
 <img src="Images/logo.jpeg" alt="Debug" title="Debug"/>
 
 </p>
 
+## 序言
 
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
 
 从 **Cobol** 语言的创始人 Grace Hopper 在继电器式计算机发现世界上第一个 Bug 开始，软件开发中 Bug 的产生就从未停止过，正如《Advanced Apple Debugging & Reverse Engineering》一书前言所述：开发者不要妄图认为如果能充分了解软件的工作方式，就不会存在 Bug，事实上，任何软件中都存在 Bug。
 
-## 调试是什么
-
+## 调试概述
 
 如果你问一个经验不丰富的程序该如何定义调试，他也许会回答你调试就是找出解决问题的方案。事实上，这只是调试中目标的一小部分，设置都不算是最终要的一部分。
 有效的调试需要如下步骤：
@@ -25,7 +23,9 @@
 
 在上面步骤中，最重要是第一步——找出导致问题的根源，这是后面其他步骤的先决条件。
 
-100个程序员就有100种调试的方法，这些方法被内化到程序的思维中，等遇到问题时会被激活出来，然而却没被详细记录在文档中。事实上，经验丰富的程序员往往具备更高明的调试技巧，也能更快的定位和解决问题。
+研究表明经验丰富的程序员调试找出 Bug 的所用的时间大约是缺乏经验的程序员的 1/20。经验丰富的程序员与缺乏经验的程序员直接存在巨大的调试效率的差异。不幸的是，有很多关于软件设计的书籍，但却深入讲调试这块的比较少，学校的课程中几乎也看不到关于调试的内容。
+
+这些年来，调试器在不断在发展，也彻底改变了程序员们的编程方式。当然调试器无法代替良好的思维，思维也无法替代优秀的调试器，最完美的组合就是优秀的调试器加上良好的思维。
 
 ## 案例
 
