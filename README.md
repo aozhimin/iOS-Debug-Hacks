@@ -89,8 +89,20 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 
 1. `+ (BOOL)resolveInstanceMethod:(SEL)sel`：对象收到未知消息后，首先会调用该方法，参数就是未知消息的 selector，返回值则表示能否新增一个实例方法处理 selector 参数。如果这一步成功处理了 selector 后，返回 `YES`，后续的转发机制不在进行。事实上，这个被经常使用在要访问 **CoreData** 框架中的 NSManagedObjects 对象的属性时。<br/>`+ (BOOL)resolveClassMethod:(SEL)sel`：和上面方法类似，区别就是上面是实例方法，这个是类方法。
 2. `- (id)forwardingTargetForSelector:(SEL)aSelector`：这个方法提供处理未知消息的备援接受者，这个比 `forwardInvocation:` 标准转发机制更快。通常可以这个方案来模拟多继承的某些特性。
-3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：如果消息转发的算法执行到这一步，代表以及开启了完整的消息转发机制，这个方法返回 `NSMethodSignature` 对象，其中包含了
+3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：如果消息转发的算法执行到这一步，代表以及开启了完整的消息转发机制，这个方法返回 `NSMethodSignature` 对象，其中包含了指定 selector 参数中的有关方法的描述，在消息转发流程中，如果需要创建 `NSInvocation` 对象也需要重写这个方法。
+4. `- (void)forwardInvocation:(NSInvocation *)anInvocation`：方法的实现通常需要完成以下任务：找出能够处理 `anInvocation` 对象封装的消息的对象；使用 `anInvocation` 给前面找出的对象发送消息，`anInvocation` 会保存返回值，运行时会将返回值发送给原来的 sender。
 
+通常将1和2的消息转发称为 **Fast Forwarding**，它提供了一种更为简便的方式进行消息转发，而为了与 **Fast Forwarding** 区分，3和4的消息转发被称之为 Normal Forwarding 或者 Regular Forwarding。 Normal Forwarding 因为要创建 **NSInvocation** 对象，所以更慢一些。
+
+> 注意：如果 `methodSignatureForSelector` 方法返回的 `NSMethodSignature` 是 nil 或者根本没有重写 `methodSignatureForSelector`，则 `forwardInvocation` 不会被执行，消息转发流程终止，抛出无法处理的异常，这个在下文 `___forwarding___`函数的源码中可以看出。
+
+下面的流程图阐述了消息转发的流程
+
+<p align="center">
+
+<img src="Images/message_forward.jpg" />
+
+</p>
 
 ### 调试过程
 
@@ -352,14 +364,6 @@ int __forwarding__(void *frameStackPointer, int isStret) {
 2. 调用 `methodSignatureForSelector` 获取方法签名后，判断返回类型信息是否正确，再调用 `forwardInvocation` 执行 `NSInvocation` 对象，并将结果返回。如果对象没实现 `methodSignatureForSelector` 方法，进入第三步。
 3. 调用 `doesNotRecognizeSelector` 方法。
 
-下面的流程图阐述了消息转发的流程
-
-<p align="center">
-
-<img src="Images/message_forward.jpg" />
-
-</p>
-
 观察我们项目中崩溃堆栈中的 `___forwarding___`，会发现他的执行路径是第二步，也就是调用了 `forwardInvocation` 执行 `NSInvocation` 对象。
 
 > 也可以在断点之后逐步执行命令，观察汇编代码的执行路径，得出结论与上面应该是一致的。
@@ -438,7 +442,7 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 }
 ```
 
-因为 `TCWebViewController` 是腾讯 SDK 中的私有类，猜想项目不大可能直接对其进行 Hook，很有可能是 Hook 了一个父类导致这个子类也受到影响，于是在项目中继续排查，找到了答案
+因为 `TCWebViewController` 是腾讯 SDK 中的私有类，猜想项目不大可能直接对其进行 Hook，很有可能是 Hook 了一个父类导致这个子类也受到影响，于是在项目中继续排查。啊哈！答案终于浮出水面。
 
 <p align="center">
 
@@ -447,4 +451,3 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 </p>
 
 导致崩溃的原因就是使用 Aspects 库 Hook `UIViewController` 类的页面生命周期方法，Aspects 的 Hook 实现会替换掉 `forwardInvocation` 方法，由于 `TCWebViewController` 的父类是 `UIViewController`，所以也会被 Hook 住，`QQforwardInvocation` 方法被覆盖，导致消息转发失败，从而无法动态生成属性的 Setter 和 Getter 方法。将 Hook `UIViewController` 的部分删除或者注释，此时再去使用 QQ 登录，应用不再崩溃。
-
