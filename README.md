@@ -81,6 +81,17 @@ Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: 
 libc++abi.dylib: terminating with uncaught exception of type NSException
 ```
 
+### 消息转发
+
+在调试之前，准备用一些篇幅讲解 Objective-C 中的消息转发（message forwarding）机制。当运行时期间对象接收到无法解读的对象后，就会开启消息转发机制，由程序员来告诉对象应该如何处理这条未知消息。
+
+消息转发中通常会涉及到下面四个方法：
+
+1. `+ (BOOL)resolveInstanceMethod:(SEL)sel`：对象收到未知消息后，首先会调用该方法，参数就是未知消息的 selector，返回值则表示能否新增一个实例方法处理 selector 参数。如果这一步成功处理了 selector 后，返回 `YES`，后续的转发机制不在进行。事实上，这个被经常使用在要访问 **CoreData** 框架中的 NSManagedObjects 对象的属性时。<br/>`+ (BOOL)resolveClassMethod:(SEL)sel`：和上面方法类似，区别就是上面是实例方法，这个是类方法。
+2. `- (id)forwardingTargetForSelector:(SEL)aSelector`：这个方法提供处理未知消息的备援接受者，这个比 `forwardInvocation:` 标准转发机制更快。通常可以这个方案来模拟多继承的某些特性。
+3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：如果消息转发的算法执行到这一步，代表以及开启了完整的消息转发机制，这个方法返回 `NSMethodSignature` 对象，其中包含了
+
+
 ### 调试过程
 
 根据上面出错信息中的 `TCWebViewController` 很自然想到与腾讯的 SDK **TencentOpenAPI.framework** 有关，但是产线的应用出现问题的时间段内没有更新腾讯的 SDK，所以应该不是直接由 **TencentOpenAPI.framework** 导致应用崩溃的。
