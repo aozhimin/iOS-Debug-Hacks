@@ -473,7 +473,7 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 
 导致崩溃的原因是 **Aspects** 与 **TencentOpenAPI** 两个库的一次完美邂逅。项目中使用 Aspects 库 Hook `UIViewController` 类的页面生命周期方法，Aspects 的 Hook 实现会替换掉 `forwardInvocation` 方法，由于 `TCWebViewController` 的父类是 `UIViewController`，所以也会被 Hook 住，`QQforwardInvocation` 方法被覆盖，导致消息转发失败，从而无法动态生成属性的 Setter 和 Getter 方法。
 
-上面案例给了我们一个警示，在使用一个第三方框架和技术的时候，我们不应该值停留在会使用的层面上，而是要深入了解他背后的工作原理。这样定位问题时才会事半功倍。
+上面案例给了我们一个警示，在使用一个第三方框架和技术的时候，我们不应该只停留在会用的层面上，而是要深入了解他背后的工作原理。这样定位问题时才会事半功倍。
 
 ## 参考资料
 
