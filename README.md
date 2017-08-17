@@ -219,6 +219,8 @@ Breakpoint 34: where = AADebug`-[TCWebViewKit open], address = 0x0000000103157f7
 
 </p>
 
+> 案例给出的是在模拟器中运行的截图，所以汇编代码是 X64 的，真机上看到的汇编代码是 ARM 汇编，但是分析的方法都是一样的，这点读者需要注意。
+
 在下图 96 行的汇编代码打一个断点，这条汇编代码就是调用 `setRequestURLStr` 方法，然后打印出 `rbx` 寄存器的内容，可以观察到 `rbx` 寄存器保存的就是 `TCWebViewController` 实例。
 
 <p align="center">
