@@ -83,7 +83,7 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 
 ### 消息转发
 
-在调试之前，准备用一些篇幅讲解 Objective-C 中的消息转发（message forwarding）机制。当运行时期间对象接收到无法解读的对象后，就会开启消息转发机制，由程序员来告诉对象应该如何处理这条未知消息。
+在开始调试之前，准备用一些篇幅讲解 Objective-C 中的消息转发（message forwarding）机制。熟悉 Objective-C 的读者应该清楚，该语言使用的是“消息结构”，而非像 C 语言的“函数调用”，如果在编译期间向对象发送了其无法解读的消息并没什么大碍，因为当运行时期间对象接收到无法解读的对象后，它可以通过开启消息转发机制来做一些补救措施，具体来说就是由程序员来告诉对象应该如何处理这条未知消息。
 
 消息转发中通常会涉及到下面四个方法：
 
