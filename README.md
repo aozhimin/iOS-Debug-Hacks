@@ -481,6 +481,6 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 
 ## 致谢
 
-特别致谢以下读者对文章支持，并对文章提出了非常有价值的建议
+特别致谢以下读者，感谢他们对文章的支持，并提出了非常宝贵的建议。
 
 * [ZenonHuang](https://github.com/ZenonHuang)
