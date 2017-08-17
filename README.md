@@ -270,7 +270,7 @@ br s -n "-[NSObject QQforwardInvocation:]"
 
 </p>
 
-`___forwarding___` 函数包含了消息转发的完整实现，反编译后的代码如下：
+`___forwarding___` 函数包含了消息转发的完整实现，反编译的代码摘自[Objective-C 消息发送与转发机制原理](http://yulingtianxia.com/blog/2016/06/15/Objective-C-Message-Sending-and-Forwarding/)一文，文中反编译代码中调用 `forwardingTargetForSelector` 时判断 forwarding 和 receiver 是否相等处应该写错了，应当是判断 forwardingTarget 和 receiver 是否相等，代码如下：
 
 ```
 int __forwarding__(void *frameStackPointer, int isStret) {
@@ -282,7 +282,7 @@ int __forwarding__(void *frameStackPointer, int isStret) {
   // 调用 forwardingTargetForSelector:
   if (class_respondsToSelector(receiverClass, @selector(forwardingTargetForSelector:))) {
     id forwardingTarget = [receiver forwardingTargetForSelector:sel];
-    if (forwardingTarget && forwarding != receiver) {
+    if (forwardingTarget && forwardingTarget != receiver) {
     	if (isStret == 1) {
     		int ret;
     		objc_msgSend_stret(&ret,forwardingTarget, sel, ...);
@@ -360,11 +360,8 @@ int __forwarding__(void *frameStackPointer, int isStret) {
 }
 ```
 
-概括如下：
-
-1. 先调用 `forwardingTargetForSelector` 方法获取新的 target 作为 receiver 重新执行 selector，如果返回的内容不合法（为 `nil` 或者跟旧 receiver 一样），那就进入第二步。
-2. 调用 `methodSignatureForSelector` 获取方法签名后，判断返回类型信息是否正确，再调用 `forwardInvocation` 执行 `NSInvocation` 对象，并将结果返回。如果对象没实现 `methodSignatureForSelector` 方法，进入第三步。
-3. 调用 `doesNotRecognizeSelector` 方法。
+通过阅读反编译代码，基本能将消息转发的流程梳理清楚，首先是调用消息转发流程中的 `forwardingTargetForSelector` 方法获取备援接受者，也就是上文说的 Fast Forwarding 阶段，从代码中可以看出如果 `forwardingTarget` 返回空，或者和 `receiver`，则进入 Regular Forwarding 阶段，具体来说就是先调用 
+`methodSignatureForSelector` 拿到方法签名，然后使用前面获取到的方法签名对象和 `frameStackPointer` 实例化 `invocation` 对象，调用 `receiver` 的 `forwardInvocation:` 方法，并将刚才实例化的 `invocation` 对象传入。最后如果没有实现 `methodSignatureForSelector` 方法并且 `selector` 已经在 Runtime 注册过了，则调用 `doesNotRecognizeSelector:` 抛出异常。
 
 观察我们项目中崩溃堆栈中的 `___forwarding___`，会发现他的执行路径是第二步，也就是调用了 `forwardInvocation` 执行 `NSInvocation` 对象。
 
@@ -487,4 +484,3 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 特别致谢以下读者对文章支持，并对文章提出了非常有价值的建议
 
 * [ZenonHuang](https://github.com/ZenonHuang)
-
