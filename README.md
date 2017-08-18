@@ -207,6 +207,8 @@ void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void 
 br s -n "-[TCWebViewKit open]"
 ```
 
+> `br s -n` 的前半部分 `br s` 表示 `breakpoint set` 的意思，`-n` 表示根据函数名称来下断点，作用和符号断点一样，使用 `br s -F` 也是可以的。直接使用 `b -[TCWebViewKit open]` 能达到同样的效果，只不过 `b` 命令是 `_regexp-break` 的缩写，是用正则匹配的方式下断点。最后也可以给在指定的内存地址设置断点，下断点的命令为 `br s -a 0x000000010940b24e`。
+
 断点成功打上。
 
 ```
