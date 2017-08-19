@@ -6,12 +6,12 @@
 
 ## Preface
 
-
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
 
 从 **Cobol** 语言的创始人 Grace Hopper 在继电器式计算机中发现世界上第一个 Bug 开始，软件开发中 Bug 的产生就从未停止，正如《Advanced Apple Debugging & Reverse Engineering》一书前言所述：开发者不要妄图认为如果能充分了解软件的工作方式，就不会存在 Bug，事实上，任何软件中都存在 Bug。所以在软件开发周期中，Debugging 几乎是一个无法避免的环节。
 
 ## Debugging Overview
+
 If you ask an inexperienced programmer
  about how to define debugging, he might say "Debugging is something you do to find a solution for your software problem". He is right, but that's just a tiny part of a real debugging.
 
@@ -24,7 +24,7 @@ Here are the steps of a real debugging:
 
 Among above steps, the most important step is the first step: find out the problem. Apparently, it's a prerequisite of other steps.
 
-Research shows the time an experienced programmer spends on debugging to locate one issue is  about one twentieth of an inexperienced programmer. That means debugging experience makes an enormous difference on programming efficiency. We have lots of books on software design, unfortunately, rare of them have introduction about debugging, even the courses in school.
+Research shows the time experienced programmers spend on debugging to locate the same set of defects is about one twentieth of inexperienced programmers. That means debugging experience makes an enormous difference on programming efficiency. We have lots of books on software design, unfortunately, rare of them have introduction about debugging, even the courses in school.
 
 ## 序言
 
@@ -34,18 +34,18 @@ Research shows the time an experienced programmer spends on debugging to locate 
 
 ## 调试概述
 
-如果你问一个经验不丰富的程序该如何定义调试，他也许会回答你调试就是找出解决问题的方案。事实上，这只是调试中目标的一小部分，甚至都不算是最重要的一部分。
+如果你问一个经验不丰富的程序员该如何定义调试，他也许会回答你调试就是找出解决问题的方案。事实上，这只是调试中目标的一小部分，甚至都不算是最重要的一部分。
 有效的调试需要如下步骤：
 
 1. 找出为什么软件没有按照期望的行为运行
 2. 解决问题
 3. 避免引发其他问题
 4. 提升代码的整体质量，包括可读性、架构、测试覆盖率、性能等方面
-5. 确保类似问题不会再其他地方再次出现
+5. 确保类似问题不会在其他地方再次出现
 
 在上面步骤中，最重要是第一步——找出导致问题的根源，这是后面其他步骤的先决条件。
 
-研究表明经验丰富的程序员调试找出 Bug 的所用的时间大约是缺乏经验的程序员的 1/20。经验丰富的程序员与缺乏经验的程序员直接存在巨大的调试效率的差异。不幸的是，有很多关于软件设计的书籍，但却深入讲调试这块的比较少，学校的课程中几乎也看不到关于调试的内容。
+研究表明经验丰富的程序员调试找出 Bug 的所用的时间大约是缺乏经验的程序员的 1/20。经验丰富的程序员与缺乏经验的程序员之间存在巨大的调试效率的差异。不幸的是，有很多关于软件设计的书籍，但却深入讲调试这块的比较少，学校的课程中几乎也看不到关于调试的内容。
 
 这些年来，调试器在不断在发展，也彻底改变了程序员们的编程方式。当然调试器无法代替良好的思维，思维也无法替代优秀的调试器，最完美的组合就是优秀的调试器加上良好的思维。
 
