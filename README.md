@@ -28,11 +28,11 @@ Research shows the time experienced programmers spend on debugging to locate the
 
 As the debugger improving over years, the programmers' coding style are changed thoroughly. But still，a good debugger cannot replace good debugging thought. In contrast, excellent debugging thought is not enough without good debugger. The perfect thing is we have both of them.
 
-下图是《调试九法:软硬件错误的排查之道》一书提及的九大调试规则。
+The following graph is the nine debugging rules described in book <Debugging: The 9 Indispensable Rules for Finding Even the Most Elusive Software and Hardware Problems>.
 
 <p align="center">
 
-<img src="Images/debug_rules.jpeg" width="500" />
+<img src="Images/debug_rules_en.jpeg" width="500" />
 
 </p>
 
