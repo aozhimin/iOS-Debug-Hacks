@@ -45,7 +45,7 @@ Research shows the time experienced programmers spend on debugging to locate the
 
 在上面步骤中，最重要是第一步——找出导致问题的根源，这是后面其他步骤的先决条件。
 
-研究表明经验丰富的程序员调试找出 Bug 的所用的时间大约是缺乏经验的程序员的 1/20。经验丰富的程序员与缺乏经验的程序员之间存在巨大的调试效率的差异。不幸的是，有很多关于软件设计的书籍，但却深入讲调试这块的比较少，学校的课程中几乎也看不到关于调试的内容。
+研究表明经验丰富的程序员调试找出 Bug 的所用的时间大约是缺乏经验的程序员的 1/20。经验丰富的程序员与缺乏经验的程序员之间存在巨大的调试效率的差异。不幸的是，有很多关于软件设计的书籍，但深入讲解调试的却比较少，学校的课程中几乎也看不到关于调试的内容。
 
 这些年来，调试器在不断在发展，也彻底改变了程序员们的编程方式。当然调试器无法代替良好的思维，思维也无法替代优秀的调试器，最完美的组合就是优秀的调试器加上良好的思维。
 
@@ -62,7 +62,7 @@ Research shows the time experienced programmers spend on debugging to locate the
 
 ### 问题
 
-故事发生我在做登录 SDK 开发的过程中，产线接到用户反馈，在点击登录页面的 QQ 图标的时候出现应用闪退的情况，试图重现的过程中发现是在用户手机未安装 QQ 的情况下，使用 QQ 登录的时候回去拉起 QQ Web 授权页，但此时会出现 `[TCWebViewController setRequestURLStr:]` 找不到 selector 的情况。
+故事发生我在做登录 SDK 开发的过程中，产线接到用户反馈，在点击登录页面的 QQ 图标的时候出现应用闪退的情况，试图重现的过程中发现是在用户手机未安装 QQ 的情况下，使用 QQ 登录的时候会去拉起 QQ Web 授权页，但此时会出现 `[TCWebViewController setRequestURLStr:]` 找不到 selector 的情况。
 
 > 注意：为了更好的讲解，下面所有涉及到具体业务，与本主题无关的地方没有列出来，同时应用名称用 **AADebug** 代替。
 
@@ -109,9 +109,9 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 
 消息转发中通常会涉及到下面四个方法：
 
-1. `+ (BOOL)resolveInstanceMethod:(SEL)sel`：对象收到未知消息后，首先会调用该方法，参数就是未知消息的 selector，返回值则表示能否新增一个实例方法处理 selector 参数。如果这一步成功处理了 selector 后，返回 `YES`，后续的转发机制不在进行。事实上，这个被经常使用在要访问 **CoreData** 框架中的 NSManagedObjects 对象的 @dynamic 属性时，以动态的插入存取方法。<br/>`+ (BOOL)resolveClassMethod:(SEL)sel`：和上面方法类似，区别就是上面是实例方法，这个是类方法。
-2. `- (id)forwardingTargetForSelector:(SEL)aSelector`：这个方法提供处理未知消息的备援接收者，这个比 `forwardInvocation:` 标准转发机制更快。通常可以这个方案来模拟多继承的某些特性。这一步我们无法操作转发的消息，如果想修改消息的内容，则应该开启完整的消息转发流程来实现。
-3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：如果消息转发的算法执行到这一步，代表以及开启了完整的消息转发机制，这个方法返回 `NSMethodSignature` 对象，其中包含了指定 selector 参数中的有关方法的描述，在消息转发流程中，如果需要创建 `NSInvocation` 对象也需要重写这个方法，`NSInvocation` 对象包含了 SEL、Target 和参数。
+1. `+ (BOOL)resolveInstanceMethod:(SEL)sel`：对象收到未知消息后，首先会调用该方法，参数就是未知消息的 selector，返回值则表示能否新增一个实例方法处理 selector 参数。如果这一步成功处理了 selector 后，返回 `YES`，后续的转发机制不再进行。事实上，这个被经常使用在要访问 **CoreData** 框架中的 NSManagedObjects 对象的 @dynamic 属性中，以动态的插入存取方法。<br/>`+ (BOOL)resolveClassMethod:(SEL)sel`：和上面方法类似，区别就是上面是实例方法，这个是类方法。
+2. `- (id)forwardingTargetForSelector:(SEL)aSelector`：这个方法提供处理未知消息的备援接收者，这个比 `forwardInvocation:` 标准转发机制更快。通常可以用这个方案来模拟多继承的某些特性。这一步我们无法操作转发的消息，如果想修改消息的内容，则应该开启完整的消息转发流程来实现。
+3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：如果消息转发的算法执行到这一步，代表已经开启了完整的消息转发机制，这个方法返回 `NSMethodSignature` 对象，其中包含了指定 selector 参数中的有关方法的描述，在消息转发流程中，如果需要创建 `NSInvocation` 对象也需要重写这个方法，`NSInvocation` 对象包含了 SEL、Target 和参数。
 4. `- (void)forwardInvocation:(NSInvocation *)anInvocation`：方法的实现通常需要完成以下任务：找出能够处理 `anInvocation` 对象封装的消息的对象；使用 `anInvocation` 给前面找出的对象发送消息，`anInvocation` 会保存返回值，运行时会将返回值发送给原来的 sender。其实通过简单的改变调用目标，然后在改变后的目标上调用，该方法就能实现与 `forwardingTargetForSelector:` 一样的行为，然而基本不这样做。
 
 通常将1和2的消息转发称为 **Fast Forwarding**，它提供了一种更为简便的方式进行消息转发，而为了与 **Fast Forwarding** 区分，3和4的消息转发被称之为 Normal Forwarding 或者 Regular Forwarding。 Normal Forwarding 因为要创建 **NSInvocation** 对象，所以更慢一些。
@@ -126,11 +126,11 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 
 </p>
 
-正如消息转发的流程图描述的，对象在上述流程的每一步都有机会处理消息。然而上文已经提到，消息转发流程越往后，处理消息所付出的代价也就越大。所以若非必要，应当尽早结束消息转发流程。如果消息转发的流程中都没有处理位置消息，最终会调用 `doesNotRecognizeSelector:` 抛出异常，表示对象无法正确识别此 SEL。
+正如消息转发的流程图描述的，对象在上述流程的每一步都有机会处理消息。然而上文已经提到，消息转发流程越往后，处理消息所付出的代价也就越大。所以若非必要，应当尽早结束消息转发流程。如果消息转发的流程中都没有处理未知消息，最终会调用 `doesNotRecognizeSelector:` 抛出异常，表示对象无法正确识别此 SEL。
 
 ### 调试过程
 
-根据上面出错信息中的 `TCWebViewController` 很自然想到与腾讯的 SDK **TencentOpenAPI.framework** 有关，但是产线的应用出现问题的时间段内没有更新腾讯的 SDK，所以应该不是直接由 **TencentOpenAPI.framework** 导致应用崩溃的。
+根据上面出错信息中的 `TCWebViewController` 很自然联想到与腾讯的 SDK **TencentOpenAPI.framework** 有关，但是产线的应用出现问题的时间段内并没有更新腾讯的 SDK，所以应该不是直接由 **TencentOpenAPI.framework** 导致应用崩溃的。
 
 首先通过反编译工具拿到 `TCWebViewController` 类的结构
 
@@ -179,9 +179,9 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
                      _OBJC_CLASS_$_TCWebViewController:
 ```
 
-静态分析的结果发现 `TCWebViewController` 类中确实没有 `requestURLStr` 的 Setter 和 Getter，因为之前版本没有出现崩溃。
+静态分析的结果发现 `TCWebViewController` 类中确实没有 `requestURLStr` 的 Setter 和 Getter 方法。因为之前版本没有出现崩溃，
 
-此时产生一个想法：`TCWebViewController` 类中的 Property 会不会像 **Core Data** 框架一样，使用 `@dynamic` 告诉编译器不做处理，然后 Getter 和 Setter 方法是在运行时动态创建。于是带着这个猜想继续查下去，发现在 **TencentOpenAPI.framework** 中有个 `NSObject` 的 Category：`NSObject(MethodSwizzlingCategory)` 非常可疑，其中 `switchMethodForCodeZipper:` 方法分别将消息转发过程中的 `methodSignatureForSelector` 和 `forwardInvocation`方法替换为 `QQmethodSignatureForSelector` 和 `QQforwardInvocation`。
+此时产生一个想法：`TCWebViewController` 类中的 Property 会不会像 **Core Data** 框架一样，使用 `@dynamic` 告诉编译器不做处理，然后 Getter 和 Setter 方法是在运行时动态创建。于是带着这个猜想继续追踪下去，发现在 **TencentOpenAPI.framework** 中有个 `NSObject` 的 Category：`NSObject(MethodSwizzlingCategory)` 非常可疑，其中 `switchMethodForCodeZipper:` 方法分别将消息转发过程中的 `methodSignatureForSelector` 和 `forwardInvocation`方法替换为 `QQmethodSignatureForSelector` 和 `QQforwardInvocation`。
 
 ```objective-c
 void +[NSObject switchMethodForCodeZipper](void * self, void * _cmd) {
@@ -198,7 +198,7 @@ void +[NSObject switchMethodForCodeZipper](void * self, void * _cmd) {
 }
 ```
 
-于是将视线转移到 `QQmethodSignatureForSelector` 中，发现在其中有个方法：`_AddDynamicPropertysSetterAndGetter`，从方法名称很容易知道这个方法是动态地给属性添加 Setter 和 Getter 方法。基本验证了 `TCWebViewController` 类中的 Property 的 Setter 和 Getter 方法是在 Runtime 动态添加。
+于是将视线转移到 `QQmethodSignatureForSelector` 中，发现在其中有个方法：`_AddDynamicPropertysSetterAndGetter`，从方法名称很容易知道这个方法就是动态地给属性添加 Setter 和 Getter 方法。基本验证了 `TCWebViewController` 类中的 Property 的 Setter 和 Getter 方法是在 Runtime 动态添加这个猜想。
 
 ```objective-c
 void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void * arg2) {
@@ -221,7 +221,7 @@ void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void 
 
 > 这里其实如果通过 LLDB 命令给 `setRequestURLStr` 方法打断点，会发现不能成功打上这个断点，原因也是因为 Setter 方法其实在编译时还没有，也能作为上面猜想的佐证。
 
-根据崩溃堆栈中可以推测出 `setRequestURLStr` 是在 `-[TCWebViewKit open]` 方法中调用的，也就是腾讯的 SDK 发现没有安装 QQ 时，会打开 QQ 的 Web 授权页。
+根据崩溃堆栈中可以推测出 `setRequestURLStr` 是在 `-[TCWebViewKit open]` 方法中调用的，也就是发生在腾讯的 SDK 检查设备没有安装 QQ 从而去打开 Web 授权页这一过程中。
 
 我们使用 LLDB 在这个方法下断点，命令如下：
 
@@ -229,7 +229,7 @@ void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void 
 br s -n "-[TCWebViewKit open]"
 ```
 
-> `br s -n` 的前半部分 `br s` 表示 `breakpoint set` 的意思，`-n` 表示根据函数名称来下断点，作用和符号断点一样，使用 `br s -F` 也是可以的。直接使用 `b -[TCWebViewKit open]` 能达到同样的效果，只不过 `b` 命令是 `_regexp-break` 的缩写，是用正则匹配的方式下断点。最后也可以给在指定的内存地址设置断点，下断点的命令为 `br s -a 0x000000010940b24e`，这种方式可以用在知道 block 内存地址的时候，给 block 设置断点。
+> `br s -n` 的前半部分 `br s` 是 `breakpoint set` 的意思，`-n` 表示根据函数名称来下断点，作用和符号断点一样，使用 `br s -F` 也是可以的。直接使用 `b -[TCWebViewKit open]` 能达到同样的效果，只不过 `b` 命令是 `_regexp-break` 的缩写，是用正则匹配的方式下断点。最后也可以给在指定的内存地址设置断点，下断点的命令为 `br s -a 0x000000010940b24e`，这种方式可以用在知道 block 内存地址的时候，给 block 设置断点。
 
 断点成功打上。
 
@@ -386,7 +386,7 @@ int __forwarding__(void *frameStackPointer, int isStret) {
 }
 ```
 
-通过阅读反编译代码，基本能将消息转发的流程梳理清楚，首先是调用消息转发流程中的 `forwardingTargetForSelector` 方法获取备援接收者，也就是上文说的 Fast Forwarding 阶段，从代码中可以看出如果 `forwardingTarget` 返回空，或者和 `receiver`，则进入 Regular Forwarding 阶段，具体来说就是先调用 
+通过阅读反编译代码，基本能将消息转发的流程梳理清楚，首先是调用消息转发流程中的 `forwardingTargetForSelector` 方法获取备援接收者，也就是上文说的 Fast Forwarding 阶段，从代码中可以看出如果 `forwardingTarget` 返回空，或者和 `receiver` 相同，则进入 Regular Forwarding 阶段，具体来说就是先调用 
 `methodSignatureForSelector` 拿到方法签名，然后使用前面获取到的方法签名对象和 `frameStackPointer` 实例化 `invocation` 对象，调用 `receiver` 的 `forwardInvocation:` 方法，并将刚才实例化的 `invocation` 对象传入。最后如果没有实现 `methodSignatureForSelector` 方法并且 `selector` 已经在 Runtime 注册过了，则调用 `doesNotRecognizeSelector:` 以抛出异常。
 
 观察我们项目中崩溃堆栈中的 `___forwarding___`，会发现他的执行路径是第二步，也就是调用了 `forwardInvocation` 执行 `NSInvocation` 对象。
@@ -399,7 +399,7 @@ int __forwarding__(void *frameStackPointer, int isStret) {
 
 </p>
 
-然而调用 `forwardInvocation` 方法究竟执行了哪个方法呢，从堆栈中我们可以看到 `__ASPECTS_ARE_BEING_CALLED__` 方法，这个是 `Aspects` 库 Hook `forwardInvocation` 的方法。
+然而调用 `forwardInvocation` 方法究竟执行了哪个方法呢？从堆栈中我们可以看到 `__ASPECTS_ARE_BEING_CALLED__` 方法，这个是 `Aspects` 库 Hook `forwardInvocation` 的方法。
 
 ```objective-c
 static void aspect_swizzleForwardInvocation(Class klass) {
@@ -491,7 +491,7 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
       }
 ```
 
-事实上，除了我们遇到的问题，**Aspects** 与 **JSPatch** 也存在兼容问题，由于两者的实现原理也类似，也会出现本文中遇到的 `doesNotRecognizeSelector:`，具体请阅读[微信读书的文章](http://wereadteam.github.io/2016/06/30/Aspects/)。笔者也逛了下 **Aspects** 与 **JSPatch** 的 Issues，也有相关两者兼容问题相关的信息。
+事实上，除了我们遇到的问题，**Aspects** 与 **JSPatch** 也存在兼容问题，由于两者的实现原理也类似，也会出现本文中遇到的 `doesNotRecognizeSelector:`，具体请阅读[微信读书的文章](http://wereadteam.github.io/2016/06/30/Aspects/)。笔者也逛了下 **Aspects** 与 **JSPatch** 的 Issues，也有与两者兼容问题相关的信息。
 
 #### Aspects 与 TencentOpenAPI 的一次完美邂逅
 
