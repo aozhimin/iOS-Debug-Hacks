@@ -4,6 +4,28 @@
 
 </p>
 
+## Preface
+
+
+> Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
+
+从 **Cobol** 语言的创始人 Grace Hopper 在继电器式计算机中发现世界上第一个 Bug 开始，软件开发中 Bug 的产生就从未停止，正如《Advanced Apple Debugging & Reverse Engineering》一书前言所述：开发者不要妄图认为如果能充分了解软件的工作方式，就不会存在 Bug，事实上，任何软件中都存在 Bug。所以在软件开发周期中，Debugging 几乎是一个无法避免的环节。
+
+## Debugging Overview
+If you ask an inexperienced programmer
+ about how to define debugging, he might say "Debugging is something you do to find a solution for your software problem". He is right, but that's just a tiny part of a real debugging.
+
+Here are the steps of a real debugging:
+1. Find out why it's behaving unexpectly
+2. Resolve it
+3. Try to make sure no new issue is involved
+4. Improve the quality of your code, include readability, architecture, test coverage and performance etc.
+5. Make sure that the same problem does not occur anywhere else
+
+Among above steps, the most important step is the first step: find out the problem. Apparently, it's a prerequisite of other steps.
+
+Research shows the time an experienced programmer spends on debugging to locate one issue is  about one twentieth of an inexperienced programmer. That means debugging experience makes an enormous difference on programming efficiency. We have lots of books on software design, unfortunately, rare of them have introduction about debugging, even the courses in school.
+
 ## 序言
 
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
