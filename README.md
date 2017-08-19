@@ -26,6 +26,62 @@ Among above steps, the most important step is the first step: find out the probl
 
 Research shows the time experienced programmers spend on debugging to locate the same set of defects is about one twentieth of inexperienced programmers. That means debugging experience makes an enormous difference on programming efficiency. We have lots of books on software design, unfortunately, rare of them have introduction about debugging, even the courses in school.
 
+As the debugger improving over years, the programmers' coding style are changed thoroughly. But still，a good debugger cannot replace good debugging thought. In contrast, excellent debugging thought is not enough without good debugger. The perfect thing is we have both of them.
+
+下图是《调试九法:软硬件错误的排查之道》一书提及的九大调试规则。
+
+<p align="center">
+
+<img src="Images/debug_rules.jpeg" width="500" />
+
+</p>
+
+## Case
+
+This article illustrates the procedure of debugging through a real case. Some of the details are changed to protect personal privacy.
+
+### Issue
+The issue we are going to talk about was happening when I was developing a login SDK. One user claimed the app crashed when he pressed the "QQ" button in login page. As we debugged this issue, we found the crash happend if the QQ app was not installed at the same time. When user presses QQ button to require a login, the QQ login SDK tries to launch an authorization web page in our app. In this case, an unrecognized selector error `[TCWebViewController setRequestURLStr:]` occurs.
+
+> P.S: To focus on the issue, the unneccessary bussion debug information are not listed below. Meanwhile **AADebug** is used as our app name. 
+
+Here is the stack trace of this crash:
+```
+Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: '-[TCWebViewController setRequestURLStr:]: unrecognized selector sent to instance 0x7fe25bd84f90'
+*** First throw call stack:
+(
+	0   CoreFoundation                      0x0000000112ce4f65 __exceptionPreprocess + 165
+	1   libobjc.A.dylib                     0x00000001125f7deb objc_exception_throw + 48
+	2   CoreFoundation                      0x0000000112ced58d -[NSObject(NSObject) doesNotRecognizeSelector:] + 205
+	3   AADebug                             0x0000000108cffefc __ASPECTS_ARE_BEING_CALLED__ + 6172
+	4   CoreFoundation                      0x0000000112c3ad97 ___forwarding___ + 487
+	5   CoreFoundation                      0x0000000112c3ab28 _CF_forwarding_prep_0 + 120
+	6   AADebug                             0x000000010a663100 -[TCWebViewKit open] + 387
+	7   AADebug                             0x000000010a6608d0 -[TCLoginViewKit loadReqURL:webTitle:delegate:] + 175
+	8   AADebug                             0x000000010a660810 -[TCLoginViewKit openWithExtraParams:] + 729
+	9   AADebug                             0x000000010a66c45e -[TencentOAuth authorizeWithTencentAppAuthInSafari:permissions:andExtraParams:delegate:] + 701
+	10  AADebug                             0x000000010a66d433 -[TencentOAuth authorizeWithPermissions:andExtraParams:delegate:inSafari:] + 564
+………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………
+
+Lines of irrelevant information are removed here
+
+………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………
+236
+14  libdispatch.dylib                   0x0000000113e28ef9 _dispatch_call_block_and_release + 12
+	15  libdispatch.dylib                   0x0000000113e4949b _dispatch_client_callout + 8
+	16  libdispatch.dylib                   0x0000000113e3134b _dispatch_main_queue_callback_4CF + 1738
+	17  CoreFoundation                      0x0000000112c453e9 __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 9
+	18  CoreFoundation                      0x0000000112c06939 __CFRunLoopRun + 2073
+	19  CoreFoundation                      0x0000000112c05e98 CFRunLoopRunSpecific + 488
+	20  GraphicsServices                    0x0000000114a13ad2 GSEventRunModal + 161
+	21  UIKit                               0x0000000110d3f676 UIApplicationMain + 171
+	22  AADebug                             0x0000000108596d3f main + 111
+	23  libdyld.dylib                       0x0000000113e7d92d start + 1
+)
+libc++abi.dylib: terminating with uncaught exception of type NSException
+```
+
+
 ## 序言
 
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
