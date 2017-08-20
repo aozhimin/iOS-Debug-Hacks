@@ -100,11 +100,139 @@ The process of message forwarding can be described by a flow diagram, see below.
 
 <p align="center">
 
-<img src="Images/message_forward.png" />
+<img src="Images/message_forward_en.png" />
 
 </p>
 
 Like described in the flow diagram, at each step, the receiver is given a chance to handle the message. Each step is more expensive than the one before it. The best practice is to handle the message forwarding process as early as possible. If the message is not handled through the whole process, `doesNotRecognizeSeletor` error is raised to state the selector cannot be recognized by the object.
+
+### Debugging Process
+
+It's time to finish the theory part and move back to the issue.
+
+According to the `TCWebViewController` information from the trace stack, we naturally associate it with the Tencent SDK **TencentOpenAPI.framework**, but we didn't update the Tencent SDK recently which means the crash was not caused by **TencentOpenAPI.framework**.
+
+First, we decompiled the code and got the struct of the `TCWebViewController` class
+
+```
+  ; @class TCWebViewController : UIViewController<UIWebViewDelegate, NSURLConnectionDelegate, NSURLConnectionDataDelegate> {
+                                       ;     @property webview
+                                       ;     @property webTitle
+                                       ;     @property requestURLStr
+                                       ;     @property error
+                                       ;     @property delegate
+                                       ;     @property activityIndicatorView
+                                       ;     @property finished
+                                       ;     @property theData
+                                       ;     @property retryCount
+                                       ;     @property hash
+                                       ;     @property superclass
+                                       ;     @property description
+                                       ;     @property debugDescription
+                                       ;     ivar _nloadCount
+                                       ;     ivar _webview
+                                       ;     ivar _webTitle
+                                       ;     ivar _requestURLStr
+                                       ;     ivar _error
+                                       ;     ivar _delegate
+                                       ;     ivar _xo
+                                       ;     ivar _activityIndicatorView
+                                       ;     ivar _finished
+                                       ;     ivar _theData
+                                       ;     ivar _retryCount
+                                       ;     -setError:
+                                       ;     -initWithNibName:bundle:
+                                       ;     -dealloc
+                                       ;     -stopLoad
+                                       ;     -doClose
+                                       ;     -viewDidLoad
+                                       ;     -loadReqURL
+                                       ;     -viewDidDisappear:
+                                       ;     -shouldAutorotateToInterfaceOrientation:
+                                       ;     -supportedInterfaceOrientations
+                                       ;     -shouldAutorotate
+                                       ;     -webViewDidStartLoad:
+                                       ;     -webViewDidFinishLoad:
+                                       ;     -webView:didFailLoadWithError:
+                                       ;     -webView:shouldStartLoadWithRequest:navigationType:
+                                       ; }
+                     _OBJC_CLASS_$_TCWebViewController:
+```
+From the static analysis result, there was no Setter and Getter method for `requestURLStr` in `TCWebViewController`. Because there was no such crash in previous app version, we came out an idea: would the property in `TCWebViewController` be implemented in a dynamic way which uses `@dynamic` to telll the compiler not generate getter and setter for the property during compiling time but dynamically created in runtime like **Core Data** framework? Then we decided to going deeply of the idea to see if our guess was correct. During our tracking, we found there was a category `NSObject(MethodSwizzlingCategory)` for `NSObject` in **TencentOpenAPI.framework** which was very suspicious. In this category, there was a method `switchMethodForCodeZipper` whose implemention replaced the `methodSignatureForSelector` and `forwardInvocation` methods to `QQmethodSignatureForSelector` and `QQforwardInvocation` methods.
+
+
+```objective-c
+void +[NSObject switchMethodForCodeZipper](void * self, void * _cmd) {
+    rbx = self;
+    objc_sync_enter(self);
+    if (*(int8_t *)_g_instance == 0x0) {
+            [NSObject swizzleMethod:@selector(methodSignatureForSelector:) withMethod:@selector(QQmethodSignatureForSelector:)];
+            [NSObject swizzleMethod:@selector(forwardInvocation:) withMethod:@selector(QQforwardInvocation:)];
+            *(int8_t *)_g_instance = 0x1;
+    }
+    rdi = rbx;
+    objc_sync_exit(rdi);
+    return;
+}
+```
+
+Then we kept tracking into `QQmethodSignatureForSelector` method, and there was a method named `_AddDynamicPropertysSetterAndGetter` in it. From the name, we can easily get that this method is to add Setter and Getter method for properties dynamically. This found can substantially verify our original guess is correct. 
+
+```objective-c
+void * -[NSObject QQmethodSignatureForSelector:](void * self, void * _cmd, void * arg2) {
+    r14 = arg2;
+    rbx = self;
+    rax = [self QQmethodSignatureForSelector:rdx];
+    if (rax == 0x0) {
+            rax = sel_getName(r14);
+            _AddDynamicPropertysSetterAndGetter();
+            rax = 0x0;
+            if (0x0 != 0x0) {
+                    rax = [rbx methodSignatureForSelector:r14];
+            }
+    }
+    return rax;
+}
+```
+But why the setter cannot recognized in `TCWebViewController` class? Is it because the `QQMethodSignatureForSelector` method was covered during our development of this version? However we couldn't find a clue even we went through everywhere in the code.
+That was very disappointing. So far the static analysis is done. Next step is using LLDB to dynamically debug the Tencent SDK to find out which path broke the creation of Getter and Setter in message forwarding process.
+
+> If we try to set breakpoint on `setRequestURLStr` through LLDB command, we will find that we cannot make it. The reason is because the setter is not available during compiling time. This can also verify our original guess.
+
+According to the crash stack trace, we can conclude `setRequestURLStr` is called in ` -[TCWebViewKit open]` method, which means the crash happens during Tencent SDK checking if the QQ app is installed and opening the authentication web page progress.
+
+Then we use below LLDB command to set breakpoint on this method:
+
+```
+br s -n "-[TCWebViewKit open]"
+```
+
+> `br s` is the abbreviation for `breakpoint set`, `-n` represents set the breakpoint according to the method name afte it, which has the same behavior with symbolic breakpoint, `br s -F` can also set the breakpoint.  `b -[TCWebViewKit open]` also works here, but `b` here is the abbreviation of `_regexp-break`, which uses  regular expression to set the breakpoint. In the end, we can also set breakpoint on memory address like `br s -a 0x000000010940b24e`, which can help to debug block if the address of the block is available.
+
+By now the breakpoint is set successfully.
+
+
+```
+Breakpoint 34: where = AADebug`-[TCWebViewKit open], address = 0x0000000103157f7d
+```
+
+When app is going to lanuch the web authentication page, the project is stopped on this breakpoint. Refer to below:
+
+<p align="center">
+
+<img src="Images/lldb_webviewkit_open.png" />
+
+</p>
+
+> This screenshot is captured when app runing on simulator, so the assembly code is based on X64. If you are using the iphone device, the assembly code should be ARM. But the analysis method is the same for them, please notice it.
+
+Set a breakpoint on Line 96, this assembly code is the `setRequestURLStr` method invocation, then print the content of `rbx` register, then we can observer that the `TCWebViewController` instance is saved in this register.
+
+<p align="center">
+
+<img src="Images/lldb_webviewkit_open_1.png" />
+
+</p>
 
 ## 序言
 
