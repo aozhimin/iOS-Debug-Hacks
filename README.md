@@ -80,7 +80,31 @@ Lines of irrelevant information are removed here
 )
 libc++abi.dylib: terminating with uncaught exception of type NSException
 ```
+### Message Forwarding
 
+Before talking about the debugging, let's get familiar with the message forwarding in Objective-C. As we know Objective-C uses a messaging structure rather than function calling. The key difference is that in the messaging structure, the runtime decides which function will be executed not compiling time. That means if an unrecognized message is sent to one object, nothing will happen during compiling time. And during runtime, when it receives a method that it doesn't understand, an object goes through message forwarding, a process designed to allow you as the developer to tell the message how to handle the unknown message.
+
+Below four methods are usually involved during message forwarding:
+
+1. `+ (BOOL)resolveInstanceMethod:(SEL)sel`: this method is called when an unknown message is passed to an object. This method takes the selector that was not found and return a Boolean value to indicate whether an instance method was added to the class that can now handle that selector. If the class can handle this selector, return Yes, then the message forward process is completed. This method is often used to access @dynamic properties of NSManagedObjects in CoreData in a dynamically way. `+ (BOOL)resolveClassMethod:(SEL)sel` method is similar with above method, the only difference is this one class method, the other is instance method.
+
+2. . `- (id)forwardingTargetForSelector:(SEL)aSelector`：This method provides a second receiver for handling unknow message, and it's faster than `forwardInvocation:`. This method can be used to imitate some features of multiple inheritance. Note that there is no way to manipulate the mssage using this part of the fowarding path. If the message needs to be altered before sending to the replacement receiver, the full forwarding mechanism must be used.
+3. . `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：If the forwarding algorithm has come this far, the full forwarding mechanism is started. `NSMethodSignature` is returned by this method which includes method description in aSelector paramter. Note that this method needs to be overrided if you want to create a `NSInvocation` object which contains selector, target, and arguments during the message forwarding.
+4. `- (void)forwardInvocation:(NSInvocation *)anInvocation`：The implemention of this method must contains below parts: Find out the object which can handle anInvocation message; Sending message to that object, the anInvocation saves the return value, runtime then sends the return value to the original message sender. In fact, this method can have the same behavior with `forwardingTargetForSelector:` method by simply changing the invocation target and invoking it afterwards, but we barely do that.
+
+Usually, the first two methods used for message forwarding are called as ***Fast Forwarding*, becuase it provides a much faster way to do the message forwarding. To distinguish from the fast forwarding, method 3 and 4 are called as **Normal Forwarding** or **Regular Forwarding**. It's much slower because it has to create **NSInvocation** object to complete the message forwarding.
+
+> Note: If `methodSignatureForSelector` method is not overwrided or the returned `NSMethodSignature` is nil, `forwardInvocation` will not be called, and the message forwarding is terminated with `doesNotRecognizeSelector` error raised. We can see it from the `__forwarding__` function's source code below.
+
+The process of message forwarding can be described by a flow diagram, see below.
+
+<p align="center">
+
+<img src="Images/message_forward.jpg" />
+
+</p>
+
+Like described in the flow diagram, at each step, the receiver is given a chance to handle the message. Each step is more expensive than the one before it. The best practice is to handle the message forwarding process as early as possible. If the message is not handled through the whole process, `doesNotRecognizeSeletor` error is raised to state the selector cannot be recognized by the object.
 
 ## 序言
 
@@ -158,6 +182,7 @@ Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: 
 )
 libc++abi.dylib: terminating with uncaught exception of type NSException
 ```
+
 
 ### 消息转发
 
