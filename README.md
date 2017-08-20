@@ -100,7 +100,7 @@ The process of message forwarding can be described by a flow diagram, see below.
 
 <p align="center">
 
-<img src="Images/message_forward.jpg" />
+<img src="Images/message_forward.png" />
 
 </p>
 
@@ -203,7 +203,7 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 
 <p align="center">
 
-<img src="Images/message_forward.jpg" />
+<img src="Images/message_forward.png" />
 
 </p>
 
