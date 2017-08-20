@@ -586,6 +586,11 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 * 《调试九法:软硬件错误的排查之道》
 * [Objective-C 消息发送与转发机制原理](http://yulingtianxia.com/blog/2016/06/15/Objective-C-Message-Sending-and-Forwarding/)
 
+## 作者
+
+* [Alex Ao](https://github.com/aozhimin)
+* [NewDu](https://github.com/NewDu)
+
 ## 致谢
 
 特别致谢以下读者，感谢他们对文章的支持，并提出了非常宝贵的建议。
