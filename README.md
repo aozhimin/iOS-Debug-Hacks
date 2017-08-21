@@ -712,8 +712,11 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 
 ## 参考资料
 
-* 《Advanced Apple Debugging & Reverse Engineering》
+* 《代码大全》
 * 《调试九法:软硬件错误的排查之道》
+* 《Advanced Apple Debugging & Reverse Engineering》
+* 《Debug It!: Find, Repair, and Prevent Bugs in Your Code》
+* 《Effective Objective-C 2.0：编写高质量iOS与OS X代码的52个有效方法》
 * [Objective-C 消息发送与转发机制原理](http://yulingtianxia.com/blog/2016/06/15/Objective-C-Message-Sending-and-Forwarding/)
 
 ## 作者
