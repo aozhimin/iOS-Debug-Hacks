@@ -484,6 +484,27 @@ This case tells us, we should not only learn how to use a third-part framework, 
 ## Summary
 We introuduce different kinds of tips in this article, but we hope you can also master a way of thinking when debugging. Skills are easy to be learned, but the way you think when resolving problem is not easy to be formed. It takes time and practice. Besides kinds of debugging techiniques, you also have to have a good sense of problem analysis, then the problem will be handy for you.
 
+## Reference Material
+
+* 《Code Complete》
+* 《Debugging: The 9 Indispensable Rules for Finding Even the Most Elusive Software and Hardware Problems》
+* 《Advanced Apple Debugging & Reverse Engineering》
+* 《Debug It!: Find, Repair, and Prevent Bugs in Your Code》
+* 《Effective Objective-C 2.0: 52 Specific Ways to Improve Your iOS and OS X Programs》
+* [Objective-C 消息发送与转发机制原理](http://yulingtianxia.com/blog/2016/06/15/Objective-C-Message-Sending-and-Forwarding/)
+
+## Author
+
+* [Alex Ao](https://github.com/aozhimin)
+* [NewDu](https://github.com/NewDu)
+
+## Thanks
+
+Special thanks to below readers, I really appreciate your suppport and valuable suggestions. 
+
+* [ZenonHuang](https://github.com/ZenonHuang)
+
+
 ## 序言
 
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
