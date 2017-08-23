@@ -234,6 +234,233 @@ Set a breakpoint on Line 96, this assembly code is the `setRequestURLStr` method
 
 </p>
 
+#### methodSignatureForSelector
+
+Next we can use LLDB to set breakpoint for `QQmethodSignatureForSelector` method:
+```
+br s -n "-[NSObject QQmethodSignatureForSelector:]"
+
+```
+
+Enter `c` in LLDB to let the breakpoint continue, then breakpoint will stop inside `QQmethodSignatureForSelector` method, which can prove our previous guess about `QQmethodSignatureForSelector` method conflicting with our code is invalid.
+<p align="center">
+
+<img src="Images/lldb_method_signature.png" />
+
+</p>
+
+Set a breakpoint at the end of `QQmethodSignatureForSelector` method, that is the `retq` command on Line 31. Then print the memory address of register `rax`, refer to below screenshot:
+
+<p align="center">
+
+<img src="Images/lldb_method_signature_1.png" />
+
+</p>
+
+By printing the memory address `0x00007fdb36d38df0` of register `rax`, `NSMethodSignature` object is returned. According to the design convention on X86 assembly language, the return value is saved in register `rax`. Apparently the `QQmethodSignatureForSelector` method is invoked and return the correct value, which means we need to keep tracking the issue.
+
+#### forwardInvocation
+
+Set breakpoint on `QQforwardInvocation` via LLDB:
+
+```
+br s -n "-[NSObject QQforwardInvocation:]"
+```
+
+After the breakpoint is set, continue the program execution, the app is crashed. And the `QQforwardInvocation` method hasn't been called yet. With this, we can conclude the `QQforwardInvocation` method is conflicted by our code.
+
+<p align="center">
+
+<img src="Images/lldb_method_signature_2.png" />
+
+</p>
+
+`___forwarding___` function contains the whole implementation of message forwarding mechanism, the decompilation code is selected from [Objective-C 消息发送与转发机制原理](http://yulingtianxia.com/blog/2016/06/15/Objective-C-Message-Sending-and-Forwarding/). In this article, there is a judgement which should be incorrect between `forwarding` and `receiver` when calling `forwardingTargetForSelector` method. Here it should be a judegement between `forwardingTarget` and `receiver`. Refer to code below:
+
+```
+int __forwarding__(void *frameStackPointer, int isStret) {
+  id receiver = *(id *)frameStackPointer;
+  SEL sel = *(SEL *)(frameStackPointer + 8);
+  const char *selName = sel_getName(sel);
+  Class receiverClass = object_getClass(receiver);
+
+  // call forwardingTargetForSelector:
+  if (class_respondsToSelector(receiverClass, @selector(forwardingTargetForSelector:))) {
+    id forwardingTarget = [receiver forwardingTargetForSelector:sel];
+    if (forwardingTarget && forwardingTarget != receiver) {
+    	if (isStret == 1) {
+    		int ret;
+    		objc_msgSend_stret(&ret,forwardingTarget, sel, ...);
+    		return ret;
+    	}
+      return objc_msgSend(forwardingTarget, sel, ...);
+    }
+  }
+
+  // Zombie Object
+  const char *className = class_getName(receiverClass);
+  const char *zombiePrefix = "_NSZombie_";
+  size_t prefixLen = strlen(zombiePrefix); // 0xa
+  if (strncmp(className, zombiePrefix, prefixLen) == 0) {
+    CFLog(kCFLogLevelError,
+          @"*** -[%s %s]: message sent to deallocated instance %p",
+          className + prefixLen,
+          selName,
+          receiver);
+    <breakpoint-interrupt>
+  }
+
+  // call methodSignatureForSelector first to get method signature , then call forwardInvocation
+  if (class_respondsToSelector(receiverClass, @selector(methodSignatureForSelector:))) {
+    NSMethodSignature *methodSignature = [receiver methodSignatureForSelector:sel];
+    if (methodSignature) {
+      BOOL signatureIsStret = [methodSignature _frameDescriptor]->returnArgInfo.flags.isStruct;
+      if (signatureIsStret != isStret) {
+        CFLog(kCFLogLevelWarning ,
+              @"*** NSForwarding: warning: method signature and compiler disagree on struct-return-edness of '%s'.  Signature thinks it does%s return a struct, and compiler thinks it does%s.",
+              selName,
+              signatureIsStret ? "" : not,
+              isStret ? "" : not);
+      }
+      if (class_respondsToSelector(receiverClass, @selector(forwardInvocation:))) {
+        NSInvocation *invocation = [NSInvocation _invocationWithMethodSignature:methodSignature frame:frameStackPointer];
+
+        [receiver forwardInvocation:invocation];
+
+        void *returnValue = NULL;
+        [invocation getReturnValue:&value];
+        return returnValue;
+      } else {
+        CFLog(kCFLogLevelWarning ,
+              @"*** NSForwarding: warning: object %p of class '%s' does not implement forwardInvocation: -- dropping message",
+              receiver,
+              className);
+        return 0;
+      }
+    }
+  }
+
+  SEL *registeredSel = sel_getUid(selName);
+
+  // if selector already registered in Runtime
+  if (sel != registeredSel) {
+    CFLog(kCFLogLevelWarning ,
+          @"*** NSForwarding: warning: selector (%p) for message '%s' does not match selector known to Objective C runtime (%p)-- abort",
+          sel,
+          selName,
+          registeredSel);
+  } // doesNotRecognizeSelector
+  else if (class_respondsToSelector(receiverClass,@selector(doesNotRecognizeSelector:))) {
+    [receiver doesNotRecognizeSelector:sel];
+  } 
+  else {
+    CFLog(kCFLogLevelWarning ,
+          @"*** NSForwarding: warning: object %p of class '%s' does not implement doesNotRecognizeSelector: -- abort",
+          receiver,
+          className);
+  }
+
+  // The point of no return.
+  kill(getpid(), 9);
+}
+```
+Basically, we can have a clear understanding through reading the decompilation code: 
+ First invoke `forwardingTargetForSelector` method during the message forwarding process to get the replacement receiver, which is also called Fast Forwarding phase. If the `forwardingTarget` returns nil or return the same receiver, the message forwarding turns into Regular Forwarding phase. Basically, invoking `methodSignatureForSelector` method to get the method signature, then using it with `frameStackPointer` to instantiate `invocation` object. Then call `forwardInvocation:` method of the `receiver`, and pass the previous `invocation`object as an argument. In the end if `methodSignatureForSelector` mehtod is not implemented and the `selector` is already registered in runtime system, `doesNotRecognizeSelector:` will be invoked to throw an error.
+
+Scrutinizing the `___forwarding___` from the crash stack trace, we can notice that it's called as the second path among the whole message forwarding path, which means `NSInvocation` object is invoked when `forwardInvocation` is called.
+
+> You can also execute the command step by step after the breakpoint to observe the execution path of the assembly code, the same result should be observed.
+
+<p align="center">
+
+<img src="Images/___forwarding___.png" />
+
+</p>
+
+And which method is executed when `forwardInvocation` is called? From the stack trace, we can see a method named `__ASPECTS_ARE_BEING_CALLED__` is executed. Look over this method through the whole project, we finally find out `forwardInvocation` is hooked by `Aspects` framework.
+
+```objective-c
+static void aspect_swizzleForwardInvocation(Class klass) {
+    NSCParameterAssert(klass);
+    // If there is no method, replace will act like class_addMethod.
+    IMP originalImplementation = class_replaceMethod(klass, @selector(forwardInvocation:), (IMP)__ASPECTS_ARE_BEING_CALLED__, "v@:@");
+    
+    if (originalImplementation) {
+        class_addMethod(klass, NSSelectorFromString(AspectsForwardInvocationSelectorName), originalImplementation, "v@:@");
+    }
+    AspectLog(@"Aspects: %@ is now aspect aware.", NSStringFromClass(klass));
+}
+```
+
+```objective-c
+// This is the swizzled forwardInvocation: method.
+static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL selector, NSInvocation *invocation) {
+    NSLog(@"selector:%@",  NSStringFromSelector(invocation.selector));
+    NSCParameterAssert(self);
+    NSCParameterAssert(invocation);
+    SEL originalSelector = invocation.selector;
+	SEL aliasSelector = aspect_aliasForSelector(invocation.selector);
+    invocation.selector = aliasSelector;
+    AspectsContainer *objectContainer = objc_getAssociatedObject(self, aliasSelector);
+    AspectsContainer *classContainer = aspect_getContainerForClass(object_getClass(self), aliasSelector);
+    AspectInfo *info = [[AspectInfo alloc] initWithInstance:self invocation:invocation];
+    NSArray *aspectsToRemove = nil;
+
+    // Before hooks.
+    aspect_invoke(classContainer.beforeAspects, info);
+    aspect_invoke(objectContainer.beforeAspects, info);
+
+    // Instead hooks.
+    BOOL respondsToAlias = YES;
+    if (objectContainer.insteadAspects.count || classContainer.insteadAspects.count) {
+        aspect_invoke(classContainer.insteadAspects, info);
+        aspect_invoke(objectContainer.insteadAspects, info);
+    }else {
+        Class klass = object_getClass(invocation.target);
+        do {
+            if ((respondsToAlias = [klass instancesRespondToSelector:aliasSelector])) {
+                [invocation invoke];
+                break;
+            }
+        }while (!respondsToAlias && (klass = class_getSuperclass(klass)));
+    }
+
+    // After hooks.
+    aspect_invoke(classContainer.afterAspects, info);
+    aspect_invoke(objectContainer.afterAspects, info);
+
+    // If no hooks are installed, call original implementation (usually to throw an exception)
+    if (!respondsToAlias) {
+        invocation.selector = originalSelector;
+        SEL originalForwardInvocationSEL = NSSelectorFromString(AspectsForwardInvocationSelectorName);
+        if ([self respondsToSelector:originalForwardInvocationSEL]) {
+            ((void( *)(id, SEL, NSInvocation *))objc_msgSend)(self, originalForwardInvocationSEL, invocation);
+        }else {
+            [self doesNotRecognizeSelector:invocation.selector];
+        }
+    }
+
+    // Remove any hooks that are queued for deregistration.
+    [aspectsToRemove makeObjectsPerformSelector:@selector(remove)];
+}
+```
+
+Since `TCWebViewController` is a private class in Tencent SDK, it's unlikely been hooked by other class directly. But it's possible its superclass is hooked which can also affect this class. With this conjecture, we kept digging. Finially, the answer surfaced! By removing or commenting the code that hooking `UIViewController`, the app didn't crash when login via QQ. So far, we were definitely sure the crash was involved by `Aspects` framework.
+
+<p align="center">
+
+<img src="Images/answer.png" />
+
+</p>
+
+`doesNotRecognizeSelector:` error is throwed by `__ASPECTS_ARE_BEING_CALLED__` method which is used to replace the IMP of `forwardInvocation:` method by **Aspects**. The implementation of `__ASPECTS_ARE_BEING_CALLED__` method has the corresponding time slice for before, instead and after the hooking in `Aspect`. Among above code, `aliasSelector` is a SEL which is handled by **Aspects**, like `aspects__setRequestURLStr:`.
+
+In Instead hooks part, invocation.target will be checked if it can responde to aliasSelector. If subclass cannot respond, the superclass will be checked,  the superclass's superclass, until root class. Since the aliasSelector cannot be responded, 
+respondsToAlias is false. Then originalSelector is assigned to be a selector of invocation. Next objc_msgSend invokes the invocation to call the original SEL. Since TCWebViewController cannot respond the `originalSelector:setRequestURLStr:` method, it finnally runs to **ASPECTS_ARE_BEING_CALLED** method in Aspects and doesNotRecognizeSelector: method is threw accordingly, which is the root cause of the crash we talked about in the beginning of this article.
+
+Some careful reader might already realize the crash could be involved with Aspects, since seeing line **__ASPECTS_ARE_BEING_CALLED__** at line 3 of the crash stack trace. The reason I still listed all the attempts here is that I hope you can learn how to locate a problem from a third-part framework without source code through static analysis and dynamic analysis. Hope the tricks and technology mentioned in this artice can be helpful for you.
+
+
 ## 序言
 
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
