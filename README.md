@@ -352,10 +352,27 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 	|:-------:|:-------:|
 	| movq %rax, %rbx | mov rbx, rax |
 	| addq $0x10, %rsp | add rsp, 010h |
+	
+	> Intel 汇编语法中的立即数与 AT&T 还有一点不同，其16进制和2进制分别以 `h` 和 `b` 作为后缀。
 
 2. 操作数方向：在 AT&T 汇编语法中，第一个操作数为源操作数，第二个操作数为目的操作数，Intel 汇编语法的操作数顺序正好相反。在这个方面 AT&T 汇编语法更接近人们日常的阅读习惯。
 3. 寻址方式：与 Intel 汇编语法相比，AT&T 的间接寻址方式会显得更难读懂一些，但是二者地址计算的公式都是：`address = disp + base + index * scale`，其中 `base` 为基址，`disp` 为偏移地址，`index * scale` 决定了第几个元素，`scale` 为元素长度，只能为2的幂，`disp/base/index/scale` 全部都是可选的, `index` 默认为0，`size` 默认为1。最终 AT&T 汇编指令的格式是 `%segreg: disp(base,index,scale)`，Intel 汇编指令的格式是 `segreg: [base+index*scale+disp]`。上面两种格式中给出的其实是段式寻址，其中 `segreg` 是段寄存器，使用在实模式下，当 CPU 可以寻址空间的位数超过寄存器的位数时，例如 CPU 可以寻址20位地址空间时，但寄存器只有16位，为了达到20位的寻址，就需要使用 `segreg:offset` 的方式来寻址，计算出来的偏移地址是 `segreg * 16 + offset`，这种方式比平坦内存模式的寻址要复杂。在保护模式下，是在线性地址下进行寻址，不必考虑段基址。
-4. 操作码的后缀：AT&T 汇编语法会在操作码后面带上一个后缀，其含义就是明确操作码的大小。后缀一般有 `b`、`w`、`l` 和 `q` 这四种，其中 `b` 是8位的字节（byte），`w` 是16位的字（word），`l` 是32位的双字（dword），在许多机器上32位数都被称为长字（long word），这其实是16位字作为标准的那个时代遗留下来的历史称呼，`q` 是64位的四字（qword）。 
+
+	| AT&T | Intel |
+	|:-------:|:-------:|
+	| movq 0xb57751(%rip), %rsi | mov rsi, [rip+b57751h] |
+	| leaq (%rax,%rbx,8), %rdi | lea rdi, [rax+rbx*8] |
+
+	> `disp` 和 `scale` 出现立即数，不用加上 `$` 后缀。
+	
+4. 操作码的后缀：AT&T 汇编语法会在操作码后面带上一个后缀，其含义就是明确操作码的大小。后缀一般有 `b`、`w`、`l` 和 `q` 这四种，其中 `b` 是8位的字节（byte），`w` 是16位的字（word），`l` 是32位的双字（dword），在许多机器上32位数都被称为长字（long word），这其实是16位字作为标准的那个时代遗留下来的历史称呼，`q` 是64位的四字（qword）。 下面列出了上面各版本的数据传送指令（mov）的区别。
+
+	| AT&T | Intel |
+	|:-------:|:-------:|
+	| movb %al, %bl | mov bl, al |
+	| movw %ax, %bx | mov bx, ax |
+	| movl %eax, %ebx | mov ebx, eax |
+	| movq %rax, %rbx | mov rbx, rax |
 
 ### 调试过程
 
