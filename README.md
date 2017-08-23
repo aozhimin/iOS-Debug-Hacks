@@ -460,6 +460,29 @@ respondsToAlias is false. Then originalSelector is assigned to be a selector of 
 
 Some careful reader might already realize the crash could be involved with Aspects, since seeing line **__ASPECTS_ARE_BEING_CALLED__** at line 3 of the crash stack trace. The reason I still listed all the attempts here is that I hope you can learn how to locate a problem from a third-part framework without source code through static analysis and dynamic analysis. Hope the tricks and technology mentioned in this artice can be helpful for you.
 
+#### Solution
+
+There are two available ways to fix the crash. One is hooking the method in **Aspects** which is less invasive, for example Method Swizzling, then the setter creation during the message forwarding process for **TencentOpenAPI** would not be interrupted. Another is replace `forwardInvocation:` with ours implementation, if both `aliasSelector` and ``originalSelector cannot response to the message forwarding, we can forward the message forwarding path back into the original path. Refer to the code below:
+
+```objective-c
+     if (!respondsToAlias) {
+          invocation.selector = originalSelector;
+          SEL originalForwardInvocationSEL = NSSelectorFromString(AspectsForwardInvocationSelectorName);
+         ((void( *)(id, SEL, NSInvocation *))objc_msgSend)(self, originalForwardInvocationSEL, invocation);
+      }
+```
+
+In fact, **Aspects** has conflicts with **JSPatch**. Since the implementation of these two SDK are similar too, `doesNotRecognizeSelector:` happens too when they are used together. Please Refer to [微信读书的文章](http://wereadteam.github.io/2016/06/30/Aspects/).
+
+
+#### A perfect crush between Aspects and TencentOpenAPI
+
+The root cause of this crash is the conflict between **Aspects** and **TencentOpenAPI** frameworks. The life cycle method in `UIViewController` class is hooked by Aspects, and the `forwardInvocation` method is replaced in the Aspects's implementation. Also, because of the superclass of `TCWebViewController` is `UIViewController` class. As a result, `QQforwardInvocation` method in `TCWebViewController` class is hooked by Aspects too. That leads to the message forwarding proccess failed, thus, the creation of getter and setter fails too.
+
+This case tells us, we should not only learn how to use a third-part framework, but also need to look into the mechanism of it. Only then, we can easily to locate the problem we meet during our work.
+
+## Summary
+We introuduce different kinds of tips in this article, but we hope you can also master a way of thinking when debugging. Skills are easy to be learned, but the way you think when resolving problem is not easy to be formed. It takes time and practice. Besides kinds of debugging techiniques, you also have to have a good sense of problem analysis, then the problem will be handy for you.
 
 ## 序言
 
