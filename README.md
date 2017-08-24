@@ -652,7 +652,9 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 	
 #### 函数
 
-一个函数调用包括将数据（以参数和返回值的形式）和控制从代码的一部分转移到另一部分。OS X x86-64 函数调用约定与 [System V Application Binary Interface AMD64 Architecture Processor Supplement](http://www.ucw.cz/~hubicka/papers/abi/) 文档中描述的函数调用约定是一致的。
+一个函数调用包括将数据（以参数和返回值的形式）和控制从代码的一部分转移到另一部分。在函数调用过程中，数据传递、局部变量的分配和释放是通过栈来实现的，而为单个函数调用分配的那部分栈称为栈帧（Stack Frame）。
+
+> OS X x86-64 函数调用约定与 [System V Application Binary Interface AMD64 Architecture Processor Supplement](http://www.ucw.cz/~hubicka/papers/abi/) 文档中描述的函数调用约定是一致的，因此鼓励读者去翻阅这篇文档。
 
 ##### 栈帧
 
@@ -667,7 +669,7 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
     frame #3: 0x00000001063840c0 UIKit`-[UIWindow addRootViewControllerViewIfPossible] + 61
     // 更多的 frame 已被省略
 ```
-事实上 `bt` 命令是得益于栈帧（Stack Frame）才能实现的，栈帧可以看成是函数执行的上下文，其中保存了函数的返回地址和局部变量，我们知道堆是从低地址向高地址延伸的，而栈是从高地址向低地址延伸的。每个函数的每次调用，都会分配给它一个独立的栈帧，rbp 寄存器指向当前栈帧的底部（高地址），被称作帧指针，rsp 寄存器指向栈帧的顶部（低地址），被称作栈指针。下图是栈帧的结构图：
+事实上 `bt` 命令是得益于栈帧才能实现的，栈帧可以看成是函数执行的上下文，其中保存了函数的返回地址和局部变量，我们知道堆是从低地址向高地址延伸的，而栈是从高地址向低地址延伸的。每个函数的每次调用，都会分配给它一个独立的栈帧，rbp 寄存器指向当前栈帧的底部（高地址），被称作帧指针，rsp 寄存器指向栈帧的顶部（低地址），被称作栈指针。下图是栈帧的结构图：
 
 <p align="center">
 
@@ -733,6 +735,9 @@ push next_instruction
 jmp  function
 ```
 
+##### Ret 指令
+
+通常会使用 `ret` 指令从被调函数返回到调用函数，这个指令实际就是从栈顶弹出地址，并跳转到这个位置继续执行。在上面的例子中其实就是跳转回 `next_instruction`。在执行 `ret` 命令之前，会将被调用者保存寄存器出栈，这个在上面的例子已经说明。
 
 
 ### 调试过程
