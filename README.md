@@ -613,7 +613,12 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 
 汇编语言是面向机器的程序设计语言，可以将其看成是各种 CPU 的机器指令的助记符集合。程序员可以使用汇编代码直接控制硬件系统工作，而且用汇编语言编写的程序具备执行速度快和占用内存少等优点。
 
-在 Apple 平台上主流的汇编语言有 x86 汇编 和 ARM 汇编，在移动设备上使用的是 ARM 汇编，这主要是因为 ARM 采用的是 RISC 架构，具备功耗低的优势，而桌面平台使用的则是 x86 汇编。iOS 模拟器的程序实际就是以 iOS 模拟器作为容器，运行在该容器中的 Mac OS 程序，所以它使用的汇编也是 x86 汇编。由于我们的案例是在 iOS 模拟器中进行调试的，所以主要的研究目标是 x86 汇编。而 x86 汇编语言演变出两个语法分支: Intel（最初用于x86平台的文档中）和 AT&T，其中 Intel 语法在 MS-DOS 和 Windows 家族中占主导地位，而 AT&T 语法则常见于 UNIX 家族中。Intel 和 AT&T 汇编在语法上存在巨大的差异，这主要体现在变量、常量、寄存器访问、间接寻址和偏移量等方面。虽然两者语法上存在巨大差异，但所基于的硬件体系是相同的，因此可以将两者其一移植到另一种的汇编格式。
+在 Apple 平台上主流的汇编语言有 x86 汇编 和 ARM 汇编，在移动设备上使用的是 ARM 汇编，这主要是因为 ARM 采用的是 RISC 架构，具备功耗低的优势，而桌面平台使用的则是 x86 汇编。iOS 模拟器的程序实际就是以 iOS 模拟器作为容器，运行在该容器中的 Mac OS 程序，所以它使用的汇编也是 x86 汇编。由于我们的案例是在 iOS 模拟器中进行调试的，所以主要的研究目标是 x86 汇编。
+
+
+#### AT&T 和 Intel
+
+x86 汇编语言演变出两个语法分支: Intel（最初用于x86平台的文档中）和 AT&T，其中 Intel 语法在 MS-DOS 和 Windows 家族中占主导地位，而 AT&T 语法则常见于 UNIX 家族中。Intel 和 AT&T 汇编在语法上存在巨大的差异，这主要体现在变量、常量、寄存器访问、间接寻址和偏移量等方面。虽然两者语法上存在巨大差异，但所基于的硬件体系是相同的，因此可以将两者其一移植到另一种的汇编格式。
 
 Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 
@@ -631,10 +636,10 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 
 	| AT&T | Intel |
 	|:-------:|:-------:|
-	| movq 0xb57751(%rip), %rsi | mov rsi, [rip+b57751h] |
-	| leaq (%rax,%rbx,8), %rdi | lea rdi, [rax+rbx*8] |
+	| movq 0xb57751(%rip), %rsi | mov rsi, qword ptr [rip+b57751h] |
+	| leaq (%rax,%rbx,8), %rdi | lea rdi, qword ptr [rax+rbx*8] |
 
-	> `disp` 和 `scale` 出现立即数，不用加上 `$` 后缀。
+	> `disp` 和 `scale` 出现立即数，不用加上 `$` 后缀。在 Intel 语法中，需要在内存操作数前面加上 `byte ptr`、`word ptr` 、`dword ptr` 和 `qword ptr`。
 	
 4. 操作码的后缀：AT&T 汇编语法会在操作码后面带上一个后缀，其含义就是明确操作码的大小。后缀一般有 `b`、`w`、`l` 和 `q` 这四种，其中 `b` 是8位的字节（byte），`w` 是16位的字（word），`l` 是32位的双字（dword），在许多机器上32位数都被称为长字（long word），这其实是16位字作为标准的那个时代遗留下来的历史称呼，`q` 是64位的四字（qword）。 下面列出了上面各版本的数据传送指令（mov）的区别。
 
@@ -644,6 +649,67 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 	| movw %ax, %bx | mov bx, ax |
 	| movl %eax, %ebx | mov ebx, eax |
 	| movq %rax, %rbx | mov rbx, rax |
+	
+#### 函数
+
+OS X x86-64 函数调用约定与 [System V Application Binary Interface AMD64 Architecture Processor Supplement](http://www.ucw.cz/~hubicka/papers/abi/) 文档中描述的函数调用约定是一致的。
+
+
+##### 栈帧
+
+使用 LLDB 调试的过程中我们可能会使用 `bt` 命令打印出当前线程的回溯信息，如下：
+
+```
+(lldb) bt
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+  * frame #0: 0x00000001054e09d4 TestDemo`-[ViewController viewDidLoad](self=0x00007fd349558950, _cmd="viewDidLoad") at ViewController.m:18
+    frame #1: 0x00000001064a6931 UIKit`-[UIViewController loadViewIfRequired] + 1344
+    frame #2: 0x00000001064a6c7d UIKit`-[UIViewController view] + 27
+    frame #3: 0x00000001063840c0 UIKit`-[UIWindow addRootViewControllerViewIfPossible] + 61
+    // 更多的 frame 已被省略
+```
+事实上 `bt` 命令是得益于栈帧（Stack Frame）才能实现的，栈帧可以看成是函数执行的上下文，其中保存了函数的返回地址和局部变量，我们知道堆是从低地址向高地址延伸的，而栈是从高地址向低地址延伸的。每个函数的每次调用，都会分配给它一个独立的栈帧，rbp 寄存器指向当前栈帧的底部（高地址），rsp 寄存器指向栈帧的顶部（低地址）。下图是栈帧的结构图：
+
+<p align="center">
+
+<img src="Images/stack_frame.png" />
+
+</p>
+
+图中左侧 `Position` 为内存地址，使用的是间接寻址的方式，Content 为前面内存地址存放的值，结合上图的栈帧结构我们分析一次函数调用的过程如下：
+
+1. 调用函数将参数压栈，如果没有参数，或者可以直接通过寄存器完成传参，则这步可以没有。
+2. 将执行完函数调用的下一条指令压栈，其实就是返回地址。
+3. 跳转到被调函数的起始地址开始执行。
+4. 被调函数将调用函数栈帧起始地址压栈，栈帧起始地址存放在 %rbp 寄存器中。
+5. 将 %rsp 寄存器赋值给 %rbp 寄存器，使得 %rbp 寄存器指向被调函数栈帧的起始地址。
+
+上述2和3步骤其实就是 `call` 指令的任务，而4和5通过汇编指令表示如下：
+
+```
+TestDemo`-[ViewController viewDidLoad]:
+    0x1054e09c0 <+0>:  pushq  %rbp //第四步
+    0x1054e09c1 <+1>:  movq   %rsp, %rbp //第五步
+```
+
+我们很容易观察到每个函数的前两条汇编指令都是上面的这两条。
+
+##### call 指令
+
+调用函数的汇编指令是 `call`，示例如下：
+
+```
+call function
+```
+
+参数中的 `function` 是 **TEXT** 段的程序，`call` 指令其实可以拆解成两步，第一步是将执行完 `call` 指令之后的地址压栈，这个地址其实是执行完调用函数体之后的返回地址；第二步是将指令执行跳转到 `function`。他其实等价于下面的命令：
+
+```
+push next_instruction
+jmp  function
+```
+
+
 
 ### 调试过程
 
