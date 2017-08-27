@@ -487,8 +487,10 @@ We introuduce different kinds of tips in this article, but we hope you can also 
 ## Reference Material
 
 * 《Code Complete》
+* 《64 Bit Intel Assembly Language Programming for Linux》
 * 《Debugging: The 9 Indispensable Rules for Finding Even the Most Elusive Software and Hardware Problems》
 * 《Advanced Apple Debugging & Reverse Engineering》
+* 《Computer Systems: A Programmer's Perspective》
 * 《Debug It!: Find, Repair, and Prevent Bugs in Your Code》
 * 《Effective Objective-C 2.0: 52 Specific Ways to Improve Your iOS and OS X Programs》
 * [Objective-C 消息发送与转发机制原理](http://yulingtianxia.com/blog/2016/06/15/Objective-C-Message-Sending-and-Forwarding/)
@@ -498,7 +500,7 @@ We introuduce different kinds of tips in this article, but we hope you can also 
 * [Alex Ao](https://github.com/aozhimin)
 * [NewDu](https://github.com/NewDu)
 
-## Thanks
+## Acknowledgements
 
 Special thanks to below readers, I really appreciate your suppport and valuable suggestions. 
 
@@ -594,7 +596,7 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：如果消息转发的算法执行到这一步，代表已经开启了完整的消息转发机制，这个方法返回 `NSMethodSignature` 对象，其中包含了指定 selector 参数中的有关方法的描述，在消息转发流程中，如果需要创建 `NSInvocation` 对象也需要重写这个方法，`NSInvocation` 对象包含了 SEL、Target 和参数。
 4. `- (void)forwardInvocation:(NSInvocation *)anInvocation`：方法的实现通常需要完成以下任务：找出能够处理 `anInvocation` 对象封装的消息的对象；使用 `anInvocation` 给前面找出的对象发送消息，`anInvocation` 会保存返回值，运行时会将返回值发送给原来的 sender。其实通过简单的改变调用目标，然后在改变后的目标上调用，该方法就能实现与 `forwardingTargetForSelector:` 一样的行为，然而基本不这样做。
 
-通常将1和2的消息转发称为 **Fast Forwarding**，它提供了一种更为简便的方式进行消息转发，而为了与 **Fast Forwarding** 区分，3和4的消息转发被称之为 Normal Forwarding 或者 Regular Forwarding。 Normal Forwarding 因为要创建 **NSInvocation** 对象，所以更慢一些。
+通常将 1 和 2 的消息转发称为 **Fast Forwarding**，它提供了一种更为简便的方式进行消息转发，而为了与 **Fast Forwarding** 区分，3和4的消息转发被称之为 Normal Forwarding 或者 Regular Forwarding。 Normal Forwarding 因为要创建 **NSInvocation** 对象，所以更慢一些。
 
 > 注意：如果 `methodSignatureForSelector` 方法返回的 `NSMethodSignature` 是 nil 或者根本没有重写 `methodSignatureForSelector`，则 `forwardInvocation` 不会被执行，消息转发流程终止，抛出无法处理的异常，这个在下文 `___forwarding___`函数的源码中可以看出。
 
@@ -619,7 +621,7 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 
 #### AT&T 和 Intel
 
-x86 汇编语言演变出两个语法分支: Intel（最初用于x86平台的文档中）和 AT&T，其中 Intel 语法在 MS-DOS 和 Windows 家族中占主导地位，而 AT&T 语法则常见于 UNIX 家族中。Intel 和 AT&T 汇编在语法上存在巨大的差异，这主要体现在变量、常量、寄存器访问、间接寻址和偏移量等方面。虽然两者语法上存在巨大差异，但所基于的硬件体系是相同的，因此可以将两者其一移植到另一种的汇编格式。在 Xcode 中的汇编语法使用的是 AT&T，所以下文会重点关注 AT&T 汇编语法。
+x86 汇编语言演变出两个语法分支: Intel（最初用于 x86 平台的文档中）和 AT&T，其中 Intel 语法在 MS-DOS 和 Windows 家族中占主导地位，而 AT&T 语法则常见于 UNIX 家族中。Intel 和 AT&T 汇编在语法上存在巨大的差异，这主要体现在变量、常量、寄存器访问、间接寻址和偏移量等方面。虽然两者语法上存在巨大差异，但所基于的硬件体系是相同的，因此可以将两者其一移植到另一种的汇编格式。在 Xcode 中的汇编语法使用的是 AT&T，所以下文会重点关注 AT&T 汇编语法。
 
 Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 
@@ -630,10 +632,10 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 	| movq %rax, %rbx | mov rbx, rax |
 	| addq $0x10, %rsp | add rsp, 010h |
 	
-	> Intel 汇编语法中的立即数与 AT&T 还有一点不同，其16进制和2进制分别以 `h` 和 `b` 作为后缀。
+	> Intel 汇编语法中的立即数与 AT&T 还有一点不同，其 16 进制和 2 进制分别以 `h` 和 `b` 作为后缀。
 
 2. 操作数方向：在 AT&T 汇编语法中，第一个操作数为源操作数，第二个操作数为目的操作数，Intel 汇编语法的操作数顺序正好相反。在这个方面 AT&T 汇编语法更接近人们日常的阅读习惯。
-3. 寻址方式：与 Intel 汇编语法相比，AT&T 的间接寻址方式会显得更难读懂一些，但是二者地址计算的公式都是：`address = disp + base + index * scale`，其中 `base` 为基址，`disp` 为偏移地址，`index * scale` 决定了第几个元素，`scale` 为元素长度，只能为2的幂，`disp/base/index/scale` 全部都是可选的, `index` 默认为0，`size` 默认为1。最终 AT&T 汇编指令的格式是 `%segreg: disp(base,index,scale)`，Intel 汇编指令的格式是 `segreg: [base+index*scale+disp]`。上面两种格式中给出的其实是段式寻址，其中 `segreg` 是段寄存器，使用在实模式下，当 CPU 可以寻址空间的位数超过寄存器的位数时，例如 CPU 可以寻址20位地址空间时，但寄存器只有16位，为了达到20位的寻址，就需要使用 `segreg:offset` 的方式来寻址，计算出来的偏移地址是 `segreg * 16 + offset`，这种方式比平坦内存模式的寻址要复杂。在保护模式下，是在线性地址下进行寻址，不必考虑段基址。
+3. 寻址方式：与 Intel 汇编语法相比，AT&T 的间接寻址方式会显得更难读懂一些，但是二者地址计算的公式都是：`address = disp + base + index * scale`，其中 `base` 为基址，`disp` 为偏移地址，`index * scale` 决定了第几个元素，`scale` 为元素长度，只能为 2 的幂，`disp/base/index/scale` 全部都是可选的, `index` 默认为 0，`scale` 默认为 1。最终 AT&T 汇编指令的格式是 `%segreg: disp(base,index,scale)`，Intel 汇编指令的格式是 `segreg: [base+index*scale+disp]`。上面两种格式中给出的其实是段式寻址，其中 `segreg` 是段寄存器，使用在实模式下，当 CPU 可以寻址空间的位数超过寄存器的位数时，例如 CPU 可以寻址 20 位地址空间时，但寄存器只有 16 位，为了达到 20 位的寻址，就需要使用 `segreg:offset` 的方式来寻址，计算出来的偏移地址是 `segreg * 16 + offset`，这种方式比平坦内存模式的寻址要复杂。在保护模式下，是在线性地址下进行寻址，不必考虑段基址。
 
 	| AT&T | Intel |
 	|:-------:|:-------:|
@@ -642,7 +644,7 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 
 	> `disp` 和 `scale` 出现立即数，不用加上 `$` 后缀。在 Intel 语法中，需要在内存操作数前面加上 `byte ptr`、`word ptr` 、`dword ptr` 和 `qword ptr`。
 	
-4. 操作码的后缀：AT&T 汇编语法会在操作码后面带上一个后缀，其含义就是明确操作码的大小。后缀一般有 `b`、`w`、`l` 和 `q` 这四种，其中 `b` 是8位的字节（byte），`w` 是16位的字（word），`l` 是32位的双字（dword），在许多机器上32位数都被称为长字（long word），这其实是16位字作为标准的那个时代遗留下来的历史称呼，`q` 是64位的四字（qword）。 下面列出了上面各版本的数据传送指令（mov）的区别。
+4. 操作码的后缀：AT&T 汇编语法会在操作码后面带上一个后缀，其含义就是明确操作码的大小。后缀一般有 `b`、`w`、`l` 和 `q` 这四种，其中 `b` 是 8 位的字节（byte），`w` 是 16 位的字（word），`l` 是 32 位的双字（dword），在许多机器上 32 位数都被称为长字（long word），这其实是 16 位字作为标准的那个时代遗留下来的历史称呼，`q` 是 64 位的四字（qword）。 下面列出了上面各版本的数据传送指令（mov）的区别。
 
 	| AT&T | Intel |
 	|:-------:|:-------:|
@@ -687,7 +689,7 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 5. 将 %rsp 寄存器赋值给 %rbp 寄存器，使得 %rbp 寄存器指向被调函数栈帧的起始地址。
 6. 将被调用者保存寄存器压栈，这步是可选的。
 
-上述2和3步骤其实就是 `call` 指令的任务，而4和5通过汇编指令表示如下：
+上述 2 和 3 步骤其实就是 `call` 指令的任务，而 4 和 5 通过汇编指令表示如下：
 
 ```
 TestDemo`-[ViewController viewDidLoad]:
@@ -695,7 +697,7 @@ TestDemo`-[ViewController viewDidLoad]:
     0x1054e09c1 <+1>:  movq   %rsp, %rbp //第五步
 ```
 
-我们很容易观察到每个函数的前两条汇编指令都是上面的这两条。图中还有一个细节就是在 rsp 寄存器下面还有一个128字节的红色区域，ABI 将这个区域称为红色地带，它是保留区域，不会被中断或信号改写，但是在函数调用过程中会被破坏，所以可以用于叶子函数的临时数据，叶子函数只那些不调用其他函数的函数。
+我们很容易观察到每个函数的前两条汇编指令都是上面的这两条。图中还有一个细节就是在 rsp 寄存器下面还有一个 128 字节的红色区域，ABI 将这个区域称为红色地带，它是保留区域，不会被中断或信号改写，但是在函数调用过程中会被破坏，所以可以用于叶子函数的临时数据，叶子函数只那些不调用其他函数的函数。
 
 ```
 UIKit`-[UIViewController loadViewIfRequired]:
@@ -707,7 +709,7 @@ UIKit`-[UIViewController loadViewIfRequired]:
     0x1064a63fb <+10>:   pushq  %r12
     0x1064a63fd <+12>:   pushq  %rbx
 ```
-上述汇编命令从 `0x1064a63f5` 到 `0x1064a63fd` 都属于第6步，在调用约定中有一类寄存器称作被调用者保存寄存器，它指的是当调用函数使用了这类寄存器，那么被调函数必须在使用之前，将它们压栈保存，然后当返回到调用函数栈帧之前，将它们出栈恢复。下面是出栈的汇编指令，可以看出 rbx 和 r12-r15 都属于这类寄存器。
+上述汇编命令从 `0x1064a63f5` 到 `0x1064a63fd` 都属于第 6 步，在调用约定中有一类寄存器称作被调用者保存寄存器，它指的是当调用函数使用了这类寄存器，那么被调函数必须在使用之前，将它们压栈保存，然后当返回到调用函数栈帧之前，将它们出栈恢复。下面是出栈的汇编指令，可以看出 rbx 和 r12-r15 都属于这类寄存器。
 
 ```
     0x1064a6c4b <+2138>: addq   $0x1f8, %rsp              ; imm = 0x1F8 
@@ -729,7 +731,7 @@ UIKit`-[UIViewController loadViewIfRequired]:
 call function
 ```
 
-参数中的 `function` 是 **TEXT** 段的程序，`call` 指令其实可以拆解成两步，第一步是将执行完 `call` 指令之后的地址压栈，这个地址其实是执行完调用函数体之后的返回地址；第二步是将指令执行跳转到 `function`。他其实等价于下面的命令：
+参数中的 `function` 是 **TEXT** 段的程序，`call` 指令其实可以拆解成两步，第一步是将执行完 `call` 指令之后的地址压栈，这个地址其实是执行完调用函数体之后的返回地址；第二步是将指令执行跳转到 `function`。 `call` 指令其实等价于下面的命令：
 
 ```
 push next_instruction
@@ -1115,7 +1117,7 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 
 在 Instead hooks 部分会检查 `invocation.target` 的类是否能响应 `aliasSelector`，如果子类不能响应，再检查父类是否响应，一直往上寻找直到 root，由于不能响应 `aliasSelector`，所以 `respondsToAlias` 为 false。随后，则会去将 `originalSelector` 赋值给 `invocation` 的 `selector`, 再通过 `objc_msgSend` 调用 `invocation`，企图去调用原始的 SEL，由于 `TCWebViewController` 原本就无法响应 `originalSelector`:`setRequestURLStr:`，Setter 方法本身就是在 Runtime 生成的，所以最终会运行到 `__ASPECTS_ARE_BEING_CALLED__` 方法中的 `doesNotRecognizeSelector:` 方法，也就会出现上文所述的崩溃的情况。
 
-其实细心的读者在崩溃堆栈的第3行看到 `__ASPECTS_ARE_BEING_CALLED__` 时就大概猜到这个崩溃与 **Aspects** 有关系，然而上述分析的过程可以解释为什么程序会运行 `__ASPECTS_ARE_BEING_CALLED__` 方法，并且通过这个案例我们也明白了如何使用静态分析和动态调试的方法去分析没有源码的第三方库，希望文章提及的一些技巧和思想能在读者以后调试的过程中有所帮助。
+其实细心的读者在崩溃堆栈的第 3 行看到 `__ASPECTS_ARE_BEING_CALLED__` 时就大概猜到这个崩溃与 **Aspects** 有关系，然而上述分析的过程可以解释为什么程序会运行 `__ASPECTS_ARE_BEING_CALLED__` 方法，并且通过这个案例我们也明白了如何使用静态分析和动态调试的方法去分析没有源码的第三方库，希望文章提及的一些技巧和思想能在读者以后调试的过程中有所帮助。
 
 #### 解决方案
 
@@ -1137,7 +1139,6 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 
 上面案例给了我们一个警示，在使用一个第三方框架和技术的时候，我们不应该只停留在会用的层面上，而是要深入了解他背后的工作原理。这样定位问题时才会事半功倍。
 
-
 ## 总结
 
 文章花了比较多的篇幅介绍了各种技巧，但是比起这些花哨的技巧，更希望读者能掌握良好的调试思想，因为良好的思维不是一朝一夕能养成的，而技巧通常都能现学现卖。只有具备良好的解决问题的思路，再辅以各种调试技巧，那么问题就迎刃而解了。
@@ -1146,8 +1147,10 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 ## 参考资料
 
 * 《代码大全》
+* 《深入理解计算机系统》
 * 《调试九法:软硬件错误的排查之道》
 * 《Advanced Apple Debugging & Reverse Engineering》
+* 《64 Bit Intel Assembly Language Programming for Linux》
 * 《Debug It!: Find, Repair, and Prevent Bugs in Your Code》
 * 《Effective Objective-C 2.0：编写高质量iOS与OS X代码的52个有效方法》
 * [Objective-C 消息发送与转发机制原理](http://yulingtianxia.com/blog/2016/06/15/Objective-C-Message-Sending-and-Forwarding/)
