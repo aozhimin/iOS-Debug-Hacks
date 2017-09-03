@@ -593,7 +593,7 @@ x86-64 有 16 个 64 位通用寄存器和 16 个浮点数寄存器，此外 CPU
 
 <p align="center">
 
-<img src="Images/register.png" height=700 />
+<img src="Images/general_register.png" height=700 />
 
 </p>
 
