@@ -537,81 +537,7 @@ Special thanks to below readers, I really appreciate your suppport and valuable 
 
 </p>
 
-## 案例
-
-文章通过一个真实的“案例故事”来描述调试过程，有些细节被我改动了，以便保护个人隐私。
-
-### 问题
-
-故事发生我在做登录 SDK 开发的过程中，产线接到用户反馈，在点击登录页面的 QQ 图标的时候出现应用闪退的情况，试图重现的过程中发现是在用户手机未安装 QQ 的情况下，使用 QQ 登录的时候会去拉起 QQ Web 授权页，但此时会出现 `[TCWebViewController setRequestURLStr:]` 找不到 selector 的情况。
-
-> 注意：为了更好的讲解，下面所有涉及到具体业务，与本主题无关的地方没有列出来，同时应用名称用 **AADebug** 代替。
-
-应用崩溃的堆栈信息如下：
-
-```
-Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: '-[TCWebViewController setRequestURLStr:]: unrecognized selector sent to instance 0x7fe25bd84f90'
-*** First throw call stack:
-(
-	0   CoreFoundation                      0x0000000112ce4f65 __exceptionPreprocess + 165
-	1   libobjc.A.dylib                     0x00000001125f7deb objc_exception_throw + 48
-	2   CoreFoundation                      0x0000000112ced58d -[NSObject(NSObject) doesNotRecognizeSelector:] + 205
-	3   AADebug                             0x0000000108cffefc __ASPECTS_ARE_BEING_CALLED__ + 6172
-	4   CoreFoundation                      0x0000000112c3ad97 ___forwarding___ + 487
-	5   CoreFoundation                      0x0000000112c3ab28 _CF_forwarding_prep_0 + 120
-	6   AADebug                             0x000000010a663100 -[TCWebViewKit open] + 387
-	7   AADebug                             0x000000010a6608d0 -[TCLoginViewKit loadReqURL:webTitle:delegate:] + 175
-	8   AADebug                             0x000000010a660810 -[TCLoginViewKit openWithExtraParams:] + 729
-	9   AADebug                             0x000000010a66c45e -[TencentOAuth authorizeWithTencentAppAuthInSafari:permissions:andExtraParams:delegate:] + 701
-	10  AADebug                             0x000000010a66d433 -[TencentOAuth authorizeWithPermissions:andExtraParams:delegate:inSafari:] + 564
-………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………
-
-省略若干无关行	
-
-………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………
-236
-	14  libdispatch.dylib                   0x0000000113e28ef9 _dispatch_call_block_and_release + 12
-	15  libdispatch.dylib                   0x0000000113e4949b _dispatch_client_callout + 8
-	16  libdispatch.dylib                   0x0000000113e3134b _dispatch_main_queue_callback_4CF + 1738
-	17  CoreFoundation                      0x0000000112c453e9 __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 9
-	18  CoreFoundation                      0x0000000112c06939 __CFRunLoopRun + 2073
-	19  CoreFoundation                      0x0000000112c05e98 CFRunLoopRunSpecific + 488
-	20  GraphicsServices                    0x0000000114a13ad2 GSEventRunModal + 161
-	21  UIKit                               0x0000000110d3f676 UIApplicationMain + 171
-	22  AADebug                             0x0000000108596d3f main + 111
-	23  libdyld.dylib                       0x0000000113e7d92d start + 1
-)
-libc++abi.dylib: terminating with uncaught exception of type NSException
-```
-
-
-### 消息转发
-
-在开始调试之前，准备用一些篇幅讲解 Objective-C 中的消息转发（message forwarding）机制。熟悉 Objective-C 的读者应该清楚，该语言使用的是“消息结构”，而非像 C 语言的“函数调用”，如果在编译期间向对象发送了其无法解读的消息并没什么大碍，因为当运行时期间对象接收到无法解读的对象后，它可以通过开启消息转发机制来做一些补救措施，具体来说就是由程序员来告诉对象应该如何处理这条未知消息。
-
-消息转发中通常会涉及到下面四个方法：
-
-1. `+ (BOOL)resolveInstanceMethod:(SEL)sel`：对象收到未知消息后，首先会调用该方法，参数就是未知消息的 selector，返回值则表示能否新增一个实例方法处理 selector 参数。如果这一步成功处理了 selector 后，返回 `YES`，后续的转发机制不再进行。事实上，这个被经常使用在要访问 **CoreData** 框架中的 NSManagedObjects 对象的 @dynamic 属性中，以动态的插入存取方法。<br/>`+ (BOOL)resolveClassMethod:(SEL)sel`：和上面方法类似，区别就是上面是实例方法，这个是类方法。
-2. `- (id)forwardingTargetForSelector:(SEL)aSelector`：这个方法提供处理未知消息的备援接收者，这个比 `forwardInvocation:` 标准转发机制更快。通常可以用这个方案来模拟多继承的某些特性。这一步我们无法操作转发的消息，如果想修改消息的内容，则应该开启完整的消息转发流程来实现。
-3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：如果消息转发的算法执行到这一步，代表已经开启了完整的消息转发机制，这个方法返回 `NSMethodSignature` 对象，其中包含了指定 selector 参数中的有关方法的描述，在消息转发流程中，如果需要创建 `NSInvocation` 对象也需要重写这个方法，`NSInvocation` 对象包含了 SEL、Target 和参数。
-4. `- (void)forwardInvocation:(NSInvocation *)anInvocation`：方法的实现通常需要完成以下任务：找出能够处理 `anInvocation` 对象封装的消息的对象；使用 `anInvocation` 给前面找出的对象发送消息，`anInvocation` 会保存返回值，运行时会将返回值发送给原来的 sender。其实通过简单的改变调用目标，然后在改变后的目标上调用，该方法就能实现与 `forwardingTargetForSelector:` 一样的行为，然而基本不这样做。
-
-通常将 1 和 2 的消息转发称为 **Fast Forwarding**，它提供了一种更为简便的方式进行消息转发，而为了与 **Fast Forwarding** 区分，3和4的消息转发被称之为 Normal Forwarding 或者 Regular Forwarding。 Normal Forwarding 因为要创建 **NSInvocation** 对象，所以更慢一些。
-
-> 注意：如果 `methodSignatureForSelector` 方法返回的 `NSMethodSignature` 是 nil 或者根本没有重写 `methodSignatureForSelector`，则 `forwardInvocation` 不会被执行，消息转发流程终止，抛出无法处理的异常，这个在下文 `___forwarding___`函数的源码中可以看出。
-
-下面这张流程图清晰地阐述了消息转发的流程。
-
-<p align="center">
-
-<img src="Images/message_forward.png" />
-
-</p>
-
-正如消息转发的流程图描述的，对象在上述流程的每一步都有机会处理消息。然而上文已经提到，消息转发流程越往后，处理消息所付出的代价也就越大。所以若非必要，应当尽早结束消息转发流程。如果消息转发的流程中都没有处理未知消息，最终会调用 `doesNotRecognizeSelector:` 抛出异常，表示对象无法正确识别此 SEL。
-
-
-### 汇编语言
+## 汇编语言
 
 > 尽管作为一名 iOS 程序员，在工作的大部分时间都不会与汇编打交道，但是了解汇编依然大有裨益，尤其是在调试没有源码的系统库和第三方库时。
 
@@ -619,7 +545,7 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 
 在 Apple 平台上主流的汇编语言有 x86 汇编 和 ARM 汇编，在移动设备上使用的是 ARM 汇编，这主要是因为 ARM 采用的是 RISC 架构，具备功耗低的优势，而桌面平台使用的则是 x86 汇编。iOS 模拟器的程序实际就是以 iOS 模拟器作为容器，运行在该容器中的 Mac OS 程序，所以它使用的汇编也是 x86 汇编。由于我们的案例是在 iOS 模拟器中进行调试的，所以主要的研究目标是 x86 汇编。
 
-#### AT&T 和 Intel
+### AT&T 和 Intel
 
 x86 汇编语言演变出两个语法分支: Intel（最初用于 x86 平台的文档中）和 AT&T，其中 Intel 语法在 MS-DOS 和 Windows 家族中占主导地位，而 AT&T 语法则常见于 UNIX 家族中。Intel 和 AT&T 汇编在语法上存在巨大的差异，这主要体现在变量、常量、寄存器访问、间接寻址和偏移量等方面。虽然两者语法上存在巨大差异，但所基于的硬件体系是相同的，因此可以将两者其一移植到另一种的汇编格式。在 Xcode 中的汇编语法使用的是 AT&T，所以下文会重点关注 AT&T 汇编语法。
 
@@ -653,7 +579,7 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 	| movl %eax, %ebx | mov ebx, eax |
 	| movq %rax, %rbx | mov rbx, rax |
 	
-#### 寄存器
+### 寄存器
 
 我们知道内存(Memory)为 CPU 存放指令和数据，内存本质上就是一个字节数组。虽然访问内存的速度相对来说已经很快了，但是仍然需要一个容量更小的，速度更快的存储单元来加快 CPU 执行指令的速度，这种存储单元就是寄存器。处理器在执行指令的过程中，所有数据在寄存器里面都只是临时存放的，然后又会被送往别处，这也是”寄存器“得名的原因。
 
@@ -815,13 +741,13 @@ Exception State Registers:
 
 上文提到在 x86-64 中有 16 个浮点数寄存器：xmm0 - xmm15，但这种说法其实隐藏了很多细节，在执行 `register read -a` 命令的输出结果中，读者或许已经观察到除了前面提到的 xmm 寄存器组，还有 stmm 和 ymm 寄存器组。stmm 应该是 st 寄存器的别名，而 st 是 x86 的浮点运算单元 FPU(Float Point Unit)用作浮点数据处理的寄存器，x86 的 FPU 中包含一个浮点寄存器栈，它包含了 8 个 80 位的可以直接进行浮点运算的寄存器 st0 - st 7，我们可以观察到输出中的 stmm 寄存器也是 80 位的。xmm 寄存器是 128 位的，而 ymm 寄存器组则是 xmm 的 256 位扩展版本。事实上，xmm 寄存器是 ymm 寄存器的低 128 位。它们之间的关系就类似前面提到的通用寄存器中 eax 寄存器是 rax 寄存器的低 32 位。SSE 增加了新的 8 个 128 位寄存器（xmm0 - xmm7），SSE（Streaming SIMD Extensions）是 Intel 在 Pentium III 中推出的 [MMX](https://zh.wikipedia.org/wiki/MMX) 扩充的指令集。AVX(Advanced Vector Extensions) 指令集是 SSE 的扩展架构，前面提到的 128 位 xmm 寄存器提升至 256 位 ymm 寄存器，就是在 AVX 架构中引入的。
 	
-#### 函数
+### 函数
 
 一个函数调用包括将数据（以参数和返回值的形式）和控制从代码的一部分转移到另一部分。在函数调用过程中，数据传递、局部变量的分配和释放是通过栈来实现的，而为单个函数调用分配的那部分栈称为栈帧（Stack Frame）。
 
 > OS X x86-64 函数调用约定与 [System V Application Binary Interface AMD64 Architecture Processor Supplement](http://www.ucw.cz/~hubicka/papers/abi/) 文档中描述的函数调用约定是一致的，因此鼓励读者去翻阅这篇文档。
 
-##### 栈帧
+#### 栈帧
 
 使用 LLDB 调试的过程中我们可能会使用 `bt` 命令打印出当前线程的回溯信息，如下：
 
@@ -885,7 +811,7 @@ UIKit`-[UIViewController loadViewIfRequired]:
     0x1064a6c5d <+2156>: callq  0x106d69e9c               ; symbol stub for: __stack_chk_fail
 ```
 
-##### Call 指令
+#### Call 指令
 
 调用函数的汇编指令是 `call`，示例如下：
 
@@ -908,11 +834,11 @@ jmp  function
 ```
 代码中给出了两种 `call` 指令的用法，第一种操作数是一个内存地址，该内存地址其实是 Mach-O 文件的符号桩（Symbol Stub），它会通过动态链接库链接器查找函数的 symbol，然后执行函数。第二种的操作数是通过间接寻址得到的。另外 AT&T 语法的绝对跳转/调用（和程序计数器的跳转）指令的非立即数的操作数前面要加 `*`。
 
-##### Ret 指令
+#### Ret 指令
 
 通常会使用 `ret` 指令从被调函数返回到调用函数，这个指令实际就是从栈顶弹出地址，并跳转到这个位置继续执行。在上面的例子中其实就是跳转回 `next_instruction`。在执行 `ret` 命令之前，会将被调用者保存寄存器出栈，这个在上面的例子已经说明。
 
-##### 传参和返回值
+#### 传参和返回值
 
 大多数函数都有参数，参数可能是整数、浮点数和指针等。此外通常函数会有返回值，比如表明执行函数的执行结果是成功还是失败。在 OSX 中，最多可以有 6 个整型（整数和指针）通过寄存器传递，这 6 个寄存器分别是 rdi, rsi, rdx, rcx, r8 和 r9，那当一个函数有超过 6 个参数时怎么办呢？不可否认确实会存在这种情况，此时就会借助栈了，将剩下的参数逆序压入栈中。OSX 允许将 8 个浮点数通过浮点数寄存器 xmm0-xmm7 进行传递。
 
@@ -928,6 +854,79 @@ jmp  function
 
 
 借助汇编知识，我们得以窥视底层的一些东西，这在有些调试场景下确有必要。尽管我想将汇编相关的知识介绍完，然而汇编的知识体系过于庞杂，无法在如此有限的篇幅内全部覆盖完。我希望读者能翻阅文中的参考资料，并极力推荐读者去阅读 **CSAPP** 的第三章——程序的机器级表示，它是很好的汇编相关的辅助材料。
+
+## 案例
+
+文章通过一个真实的“案例故事”来描述调试过程，有些细节被我改动了，以便保护个人隐私。
+
+### 问题
+
+故事发生我在做登录 SDK 开发的过程中，产线接到用户反馈，在点击登录页面的 QQ 图标的时候出现应用闪退的情况，试图重现的过程中发现是在用户手机未安装 QQ 的情况下，使用 QQ 登录的时候会去拉起 QQ Web 授权页，但此时会出现 `[TCWebViewController setRequestURLStr:]` 找不到 selector 的情况。
+
+> 注意：为了更好的讲解，下面所有涉及到具体业务，与本主题无关的地方没有列出来，同时应用名称用 **AADebug** 代替。
+
+应用崩溃的堆栈信息如下：
+
+```
+Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: '-[TCWebViewController setRequestURLStr:]: unrecognized selector sent to instance 0x7fe25bd84f90'
+*** First throw call stack:
+(
+	0   CoreFoundation                      0x0000000112ce4f65 __exceptionPreprocess + 165
+	1   libobjc.A.dylib                     0x00000001125f7deb objc_exception_throw + 48
+	2   CoreFoundation                      0x0000000112ced58d -[NSObject(NSObject) doesNotRecognizeSelector:] + 205
+	3   AADebug                             0x0000000108cffefc __ASPECTS_ARE_BEING_CALLED__ + 6172
+	4   CoreFoundation                      0x0000000112c3ad97 ___forwarding___ + 487
+	5   CoreFoundation                      0x0000000112c3ab28 _CF_forwarding_prep_0 + 120
+	6   AADebug                             0x000000010a663100 -[TCWebViewKit open] + 387
+	7   AADebug                             0x000000010a6608d0 -[TCLoginViewKit loadReqURL:webTitle:delegate:] + 175
+	8   AADebug                             0x000000010a660810 -[TCLoginViewKit openWithExtraParams:] + 729
+	9   AADebug                             0x000000010a66c45e -[TencentOAuth authorizeWithTencentAppAuthInSafari:permissions:andExtraParams:delegate:] + 701
+	10  AADebug                             0x000000010a66d433 -[TencentOAuth authorizeWithPermissions:andExtraParams:delegate:inSafari:] + 564
+………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………
+
+省略若干无关行	
+
+………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………
+236
+	14  libdispatch.dylib                   0x0000000113e28ef9 _dispatch_call_block_and_release + 12
+	15  libdispatch.dylib                   0x0000000113e4949b _dispatch_client_callout + 8
+	16  libdispatch.dylib                   0x0000000113e3134b _dispatch_main_queue_callback_4CF + 1738
+	17  CoreFoundation                      0x0000000112c453e9 __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 9
+	18  CoreFoundation                      0x0000000112c06939 __CFRunLoopRun + 2073
+	19  CoreFoundation                      0x0000000112c05e98 CFRunLoopRunSpecific + 488
+	20  GraphicsServices                    0x0000000114a13ad2 GSEventRunModal + 161
+	21  UIKit                               0x0000000110d3f676 UIApplicationMain + 171
+	22  AADebug                             0x0000000108596d3f main + 111
+	23  libdyld.dylib                       0x0000000113e7d92d start + 1
+)
+libc++abi.dylib: terminating with uncaught exception of type NSException
+```
+
+
+### 消息转发
+
+在开始调试之前，准备用一些篇幅讲解 Objective-C 中的消息转发（message forwarding）机制。熟悉 Objective-C 的读者应该清楚，该语言使用的是“消息结构”，而非像 C 语言的“函数调用”，如果在编译期间向对象发送了其无法解读的消息并没什么大碍，因为当运行时期间对象接收到无法解读的对象后，它可以通过开启消息转发机制来做一些补救措施，具体来说就是由程序员来告诉对象应该如何处理这条未知消息。
+
+消息转发中通常会涉及到下面四个方法：
+
+1. `+ (BOOL)resolveInstanceMethod:(SEL)sel`：对象收到未知消息后，首先会调用该方法，参数就是未知消息的 selector，返回值则表示能否新增一个实例方法处理 selector 参数。如果这一步成功处理了 selector 后，返回 `YES`，后续的转发机制不再进行。事实上，这个被经常使用在要访问 **CoreData** 框架中的 NSManagedObjects 对象的 @dynamic 属性中，以动态的插入存取方法。<br/>`+ (BOOL)resolveClassMethod:(SEL)sel`：和上面方法类似，区别就是上面是实例方法，这个是类方法。
+2. `- (id)forwardingTargetForSelector:(SEL)aSelector`：这个方法提供处理未知消息的备援接收者，这个比 `forwardInvocation:` 标准转发机制更快。通常可以用这个方案来模拟多继承的某些特性。这一步我们无法操作转发的消息，如果想修改消息的内容，则应该开启完整的消息转发流程来实现。
+3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：如果消息转发的算法执行到这一步，代表已经开启了完整的消息转发机制，这个方法返回 `NSMethodSignature` 对象，其中包含了指定 selector 参数中的有关方法的描述，在消息转发流程中，如果需要创建 `NSInvocation` 对象也需要重写这个方法，`NSInvocation` 对象包含了 SEL、Target 和参数。
+4. `- (void)forwardInvocation:(NSInvocation *)anInvocation`：方法的实现通常需要完成以下任务：找出能够处理 `anInvocation` 对象封装的消息的对象；使用 `anInvocation` 给前面找出的对象发送消息，`anInvocation` 会保存返回值，运行时会将返回值发送给原来的 sender。其实通过简单的改变调用目标，然后在改变后的目标上调用，该方法就能实现与 `forwardingTargetForSelector:` 一样的行为，然而基本不这样做。
+
+通常将 1 和 2 的消息转发称为 **Fast Forwarding**，它提供了一种更为简便的方式进行消息转发，而为了与 **Fast Forwarding** 区分，3和4的消息转发被称之为 Normal Forwarding 或者 Regular Forwarding。 Normal Forwarding 因为要创建 **NSInvocation** 对象，所以更慢一些。
+
+> 注意：如果 `methodSignatureForSelector` 方法返回的 `NSMethodSignature` 是 nil 或者根本没有重写 `methodSignatureForSelector`，则 `forwardInvocation` 不会被执行，消息转发流程终止，抛出无法处理的异常，这个在下文 `___forwarding___`函数的源码中可以看出。
+
+下面这张流程图清晰地阐述了消息转发的流程。
+
+<p align="center">
+
+<img src="Images/message_forward.png" />
+
+</p>
+
+正如消息转发的流程图描述的，对象在上述流程的每一步都有机会处理消息。然而上文已经提到，消息转发流程越往后，处理消息所付出的代价也就越大。所以若非必要，应当尽早结束消息转发流程。如果消息转发的流程中都没有处理未知消息，最终会调用 `doesNotRecognizeSelector:` 抛出异常，表示对象无法正确识别此 SEL。
 
 ### 调试过程
 
