@@ -862,7 +862,7 @@ jmp  function
 
 ```
 - (IBAction)test:(id)sender {
-    DDLogError(@"TestDDLog:%@", sender);
+    DDLogError(@"TestDDLog:%@", sender);
 }
 ```
 
@@ -899,6 +899,13 @@ jmp  function
     0x102c5692b <+235>: callq  0x102c7d2be               ; symbol stub for: objc_msgSend
 ```
 
+由于 Objective-C 的方法最终会转化为对 `objc_msgSend` 方法的调用，所以 `log:level:flag:context:file:function:line:tag:format:` 方法最终会转化如下代码：
+
+```
+objc_msgSend(DDLog, @selector(log:level:flag:context:file:function:line:tag:format:), asynchronous, level, flag, context, file, function, line, tag, format, sender)
+```
+
+上文已经提到函数调用的前 6 个参数可以使用寄存器，而超过的部分则只能通过栈帧来传递。上面的函数调用超过了 6 个参数，所以传参过程既会使用寄存器，也会压栈。下面两个表格描述了在调用 `DDLogError` 宏的传参过程使用到的寄存器和栈帧的详细情况。
 
 | 通用寄存器 | 值 | 函数参数 | 汇编指令 | 备注 |
 |:-------:|:-------:|:-------:|:-------:|:-------:|
@@ -915,7 +922,7 @@ jmp  function
 | 0x8(%rsp) | "-[ViewController test:]" | function | 0x102c56908 <+200>: movq   %rbx, 0x8(%rsp) | |
 | 0x10(%rsp) | 0X22 | line | 0x102c5690d <+205>: movq   $0x22, 0x10(%rsp) | 对应的 DDLogError 调用在文件中的第 34 行 |
 | 0x18(%rsp) | 0X0 | tag | 0x102c56916 <+214>: movq   $0x0, 0x18(%rsp) | nil |
-| 0x20(%rsp) | "TestDDLog:%@" | format | 0x102c5691f <+223>: movq   %r10, 0x20(%rsp) | |
+| 0x20(%rsp) | "TestDDLog:%@" | format | 0x102c5691f <+223>: movq   %r10, 0x20(%rsp) | |
 | 0x28(%rsp) | sender | 可变参数中的第一个参数 | 0x102c56924 <+228>: movq   %r14, 0x28(%rsp) | UIButton 的实例 |
 
 借助汇编知识，我们得以窥视底层的一些东西，这在有些调试场景下确有必要。尽管我想将汇编相关的知识介绍完，然而汇编的知识体系过于庞杂，无法在如此有限的篇幅内全部覆盖完。我希望读者能翻阅文中的参考资料，并极力推荐读者去阅读 **CSAPP** 的第三章——程序的机器级表示，它是很好的汇编相关的辅助材料。
