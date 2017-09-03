@@ -858,6 +858,65 @@ jmp  function
 
 上图中的 `preserved across function calls` 表明该寄存器是否上文提及的保存寄存器，可以观察到除了上文的 rbx 和 r12-r15，rsp 和 rbp 也是栈保存寄存器，这主要是因为这两个寄存器保存着指向程序栈重要位置的指针，这个在讲解函数调用过程中的栈帧结构的时候已经详细说明，此处不再赘述了。
 
+下面将以一个真实的例子来讲解函数调用过程中的汇编指令，我们以 CocoaLumberjack 中的 `DDLogError` 这个宏进行讲解，调用这个宏实际会调用 `log:level:flag:context:file:function:line:tag:format:` 类方法，下面的代码清单是调用 `DDLogError` 的源代码和对应的汇编代码：
+
+```
+- (IBAction)test:(id)sender {
+    DDLogError(@"TestDDLog:%@", sender);
+}
+```
+
+```
+    0x102c568a3 <+99>:  xorl   %edx, %edx
+    0x102c568a5 <+101>: movl   $0x1, %eax
+    0x102c568aa <+106>: movl   %eax, %r8d
+    0x102c568ad <+109>: xorl   %eax, %eax
+    0x102c568af <+111>: movl   %eax, %r9d
+    0x102c568b2 <+114>: leaq   0x2a016(%rip), %rcx       ; "/Users/dev-aozhimin/Desktop/TestDDLog/TestDDLog/ViewController.m"
+    0x102c568b9 <+121>: leaq   0x2a050(%rip), %rsi       ; "-[ViewController test:]"
+    0x102c568c0 <+128>: movl   $0x22, %eax
+    0x102c568c5 <+133>: movl   %eax, %edi
+    0x102c568c7 <+135>: leaq   0x2dce2(%rip), %r10       ; @"\eTestDDLog:%@"
+    0x102c568ce <+142>: movq   0x33adb(%rip), %r11       ; (void *)0x0000000102c8ad18: DDLog
+    0x102c568d5 <+149>: movq   0x34694(%rip), %rbx       ; ddLogLevel
+    0x102c568dc <+156>: movq   -0x30(%rbp), %r14
+    0x102c568e0 <+160>: movq   0x332f9(%rip), %r15       ; "log:level:flag:context:file:function:line:tag:format:"
+    0x102c568e7 <+167>: movq   %rdi, -0x48(%rbp)
+    0x102c568eb <+171>: movq   %r11, %rdi
+    0x102c568ee <+174>: movq   %rsi, -0x50(%rbp)
+    0x102c568f2 <+178>: movq   %r15, %rsi
+    0x102c568f5 <+181>: movq   %rcx, -0x58(%rbp)
+    0x102c568f9 <+185>: movq   %rbx, %rcx
+    0x102c568fc <+188>: movq   -0x58(%rbp), %r11
+    0x102c56900 <+192>: movq   %r11, (%rsp)
+    0x102c56904 <+196>: movq   -0x50(%rbp), %rbx
+    0x102c56908 <+200>: movq   %rbx, 0x8(%rsp)
+    0x102c5690d <+205>: movq   $0x22, 0x10(%rsp)
+    0x102c56916 <+214>: movq   $0x0, 0x18(%rsp)
+    0x102c5691f <+223>: movq   %r10, 0x20(%rsp)
+    0x102c56924 <+228>: movq   %r14, 0x28(%rsp)
+    0x102c56929 <+233>: movb   $0x0, %al
+    0x102c5692b <+235>: callq  0x102c7d2be               ; symbol stub for: objc_msgSend
+```
+
+
+| 通用寄存器 | 值 | 函数参数 | 汇编指令 | 备注 |
+|:-------:|:-------:|:-------:|:-------:|:-------:|
+| rdi | DDLog | self | 0x102c568eb <+171>: movq   %r11, %rdi | |
+| rsi | "log:level:flag:context:file:function:line:tag:format:" | op | 0x102c568f2 <+178>: movq   %r15, %rsi | |
+| rdx | 0 | asynchronous | 0x102c568a3 <+99>:  xorl   %edx, %edx | NO |
+| rcx | 18446744073709551615 | level | 0x102c568f9 <+185>: movq   %rbx, %rcx | (DDLogLevelAll 或 NSUIntegerMax) |
+| r8 | 1 | flag | 0x102c568aa <+106>: movl   %eax, %r8d | DDLogFlagError |
+| r9 | 0 | context | 0x102c568af <+111>: movl   %eax, %r9d | |
+
+| 栈帧偏移 | 值 | 函数参数 | 汇编指令 | 备注 |
+|:-------:|:-------:|:-------:|:-------:|:-------:|
+| (%rsp) | "/Users/dev-aozhimin/Desktop/TestDDLog/TestDDLog/ViewController.m" | file | 0x102c56900 <+192>: movq   %r11, (%rsp) | |
+| 0x8(%rsp) | "-[ViewController test:]" | function | 0x102c56908 <+200>: movq   %rbx, 0x8(%rsp) | |
+| 0x10(%rsp) | 0X22 | line | 0x102c5690d <+205>: movq   $0x22, 0x10(%rsp) | 对应的 DDLogError 调用在文件中的第 34 行 |
+| 0x18(%rsp) | 0X0 | tag | 0x102c56916 <+214>: movq   $0x0, 0x18(%rsp) | nil |
+| 0x20(%rsp) | "TestDDLog:%@" | format | 0x102c5691f <+223>: movq   %r10, 0x20(%rsp) | |
+| 0x28(%rsp) | sender | 可变参数中的第一个参数 | 0x102c56924 <+228>: movq   %r14, 0x28(%rsp) | UIButton 的实例 |
 
 借助汇编知识，我们得以窥视底层的一些东西，这在有些调试场景下确有必要。尽管我想将汇编相关的知识介绍完，然而汇编的知识体系过于庞杂，无法在如此有限的篇幅内全部覆盖完。我希望读者能翻阅文中的参考资料，并极力推荐读者去阅读 **CSAPP** 的第三章——程序的机器级表示，它是很好的汇编相关的辅助材料。
 
