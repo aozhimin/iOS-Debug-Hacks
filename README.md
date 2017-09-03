@@ -740,6 +740,12 @@ Exception State Registers:
 ```
 
 上文提到在 x86-64 中有 16 个浮点数寄存器：xmm0 - xmm15，但这种说法其实隐藏了很多细节，在执行 `register read -a` 命令的输出结果中，读者或许已经观察到除了前面提到的 xmm 寄存器组，还有 stmm 和 ymm 寄存器组。stmm 应该是 st 寄存器的别名，而 st 是 x86 的浮点运算单元 FPU(Float Point Unit)用作浮点数据处理的寄存器，x86 的 FPU 中包含一个浮点寄存器栈，它包含了 8 个 80 位的可以直接进行浮点运算的寄存器 st0 - st 7，我们可以观察到输出中的 stmm 寄存器也是 80 位的。xmm 寄存器是 128 位的，而 ymm 寄存器组则是 xmm 的 256 位扩展版本。事实上，xmm 寄存器是 ymm 寄存器的低 128 位。它们之间的关系就类似前面提到的通用寄存器中 eax 寄存器是 rax 寄存器的低 32 位。SSE 增加了新的 8 个 128 位寄存器（xmm0 - xmm7），SSE（Streaming SIMD Extensions）是 Intel 在 Pentium III 中推出的 [MMX](https://zh.wikipedia.org/wiki/MMX) 扩充的指令集。AVX(Advanced Vector Extensions) 指令集是 SSE 的扩展架构，前面提到的 128 位 xmm 寄存器提升至 256 位 ymm 寄存器，就是在 AVX 架构中引入的。
+
+<p align="center">
+
+<img src="Images/float_register.png" />
+
+</p>
 	
 ### 函数
 
