@@ -911,7 +911,7 @@ objc_msgSend(DDLog, @selector(log:level:flag:context:file:function:line:tag:form
 |:-------:|:-------:|:-------:|:-------:|:-------:|
 | rdi | DDLog | self | 0x102c568eb <+171>: movq   %r11, %rdi | |
 | rsi | "log:level:flag:context:file:function:line:tag:format:" | op | 0x102c568f2 <+178>: movq   %r15, %rsi | |
-| rdx | 0 | asynchronous | 0x102c568a3 <+99>:  xorl   %edx, %edx | NO |
+| rdx | 0 | asynchronous | 0x102c568a3 <+99>:  xorl   %edx, %edx | xorl 命令为异或运算，因此此处相当于将 edx 寄存器清零 |
 | rcx | 18446744073709551615 | level | 0x102c568f9 <+185>: movq   %rbx, %rcx | (DDLogLevelAll 或 NSUIntegerMax) |
 | r8 | 1 | flag | 0x102c568aa <+106>: movl   %eax, %r8d | DDLogFlagError |
 | r9 | 0 | context | 0x102c568af <+111>: movl   %eax, %r9d | |
@@ -924,6 +924,8 @@ objc_msgSend(DDLog, @selector(log:level:flag:context:file:function:line:tag:form
 | 0x18(%rsp) | 0X0 | tag | 0x102c56916 <+214>: movq   $0x0, 0x18(%rsp) | nil |
 | 0x20(%rsp) | "TestDDLog:%@" | format | 0x102c5691f <+223>: movq   %r10, 0x20(%rsp) | |
 | 0x28(%rsp) | sender | 可变参数中的第一个参数 | 0x102c56924 <+228>: movq   %r14, 0x28(%rsp) | UIButton 的实例 |
+
+> 当寄存器的值是字符串的时候，比如上面 `rsi` 寄存器存储 `op` 参数的值，LLDB 可以通过 `po (char *) $rsi` 命令输出寄存器对应的字符串值，否则直接使用 `po $rsi`，只会按照整数格式输出 `rsi` 寄存器的值。
 
 借助汇编知识，我们得以窥视底层的一些东西，这在有些调试场景下确有必要。尽管我想将汇编相关的知识介绍完，然而汇编的知识体系过于庞杂，无法在如此有限的篇幅内全部覆盖完。我希望读者能翻阅文中的参考资料，并极力推荐读者去阅读 **CSAPP** 的第三章——程序的机器级表示，它是很好的汇编相关的辅助材料。
 
