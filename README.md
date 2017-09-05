@@ -549,6 +549,8 @@ Special thanks to below readers, I really appreciate your suppport and valuable 
 
 x86 汇编语言演变出两个语法分支: Intel（最初用于 x86 平台的文档中）和 AT&T，其中 Intel 语法在 MS-DOS 和 Windows 家族中占主导地位，而 AT&T 语法则常见于 UNIX 家族中。Intel 和 AT&T 汇编在语法上存在巨大的差异，这主要体现在变量、常量、寄存器访问、间接寻址和偏移量等方面。虽然两者语法上存在巨大差异，但所基于的硬件体系是相同的，因此可以将两者其一移植到另一种的汇编格式。在 Xcode 中的汇编语法使用的是 AT&T，所以下文会重点关注 AT&T 汇编语法。
 
+> 读者需要注意的是反汇编工具 Hopper Disassemble 和 IDA Pro 使用的是 Intel 汇编语法。
+
 Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 
 1. 操作数前缀：AT&T 汇编语法中的寄存器名称都以 `%` 作为前缀，立即操作数则以 `$` 作为前缀，而 Intel 汇编语法的寄存器和立即数均无前缀修饰。另外一个区别是 AT&T 汇编语法中的十六进制会加上 `0x` 前缀。下表给出了两者操作数前缀区别的示例：
@@ -560,8 +562,8 @@ Intel 和 AT&T 汇编语法的差异主要有以下几个方面：
 	
 	> Intel 汇编语法中的立即数与 AT&T 还有一点不同，其 16 进制和 2 进制分别以 `h` 和 `b` 作为后缀。
 
-2. 操作数方向：在 AT&T 汇编语法中，第一个操作数为源操作数，第二个操作数为目的操作数，Intel 汇编语法的操作数顺序正好相反。在这个方面 AT&T 汇编语法更接近人们日常的阅读习惯。
-3. 寻址方式：与 Intel 汇编语法相比，AT&T 的间接寻址方式会显得更难读懂一些，但是二者地址计算的公式都是：`address = disp + base + index * scale`，其中 `base` 为基址，`disp` 为偏移地址，`index * scale` 决定了第几个元素，`scale` 为元素长度，只能为 2 的幂，`disp/base/index/scale` 全部都是可选的, `index` 默认为 0，`scale` 默认为 1。最终 AT&T 汇编指令的格式是 `%segreg: disp(base,index,scale)`，Intel 汇编指令的格式是 `segreg: [base+index*scale+disp]`。上面两种格式中给出的其实是段式寻址，其中 `segreg` 是段寄存器，使用在实模式下，当 CPU 可以寻址空间的位数超过寄存器的位数时，例如 CPU 可以寻址 20 位地址空间时，但寄存器只有 16 位，为了达到 20 位的寻址，就需要使用 `segreg:offset` 的方式来寻址，计算出来的偏移地址是 `segreg * 16 + offset`，这种方式比平坦内存模式的寻址要复杂。在保护模式下，是在线性地址下进行寻址，不必考虑段基址。
+2. 操作数方向：在 AT&T 汇编语法中，第一个操作数为源操作数，第二个操作数为目的操作数，Intel 汇编语法的操作数顺序正好相反。从这个角度来看，AT&T 汇编语法似乎更接近人们日常的阅读习惯。
+3. 寻址方式：与 Intel 汇编语法相比，AT&T 的间接寻址方式会显得更难读懂一些，但是二者地址计算的公式都是：`address = disp + base + index * scale`，其中 `base` 为基址，`disp` 为偏移地址，`index * scale` 决定了第几个元素，`scale` 为元素长度，只能为 2 的幂，`disp/base/index/scale` 全部都是可选的, `index` 默认为 0，`scale` 默认为 1。最终 AT&T 汇编指令的格式是 `%segreg: disp(base,index,scale)`，Intel 汇编指令的格式是 `segreg: [base+index*scale+disp]`。上面两种格式中给出的其实是段式寻址，其中 `segreg` 是段寄存器，使用在实模式下，当 CPU 可以寻址空间的位数超过寄存器的位数时，例如 CPU 可以寻址 20 位地址空间时，但寄存器只有 16 位，为了达到 20 位的寻址，就需要使用 `segreg:offset` 的方式来寻址，这样计算出来的偏移地址就是 `segreg * 16 + offset`，这种方式比平坦内存模式的寻址要复杂。在保护模式下，是在线性地址空间下进行寻址，也就不必考虑段基址。
 
 	| AT&T | Intel |
 	|:-------:|:-------:|
