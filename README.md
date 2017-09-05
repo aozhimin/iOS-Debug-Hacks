@@ -741,7 +741,7 @@ Exception State Registers:
   faultvaddr = 0x000000010bb91000  
 ```
 
-上文已经提到在 x86-64 中有 16 个浮点数寄存器：xmm0 - xmm15，但这种说法其实隐藏了很多细节，其实在执行 `register read -a` 命令的输出结果中，读者或许已经观察到除了前面提到的 xmm 寄存器组，还有 stmm 和 ymm 寄存器组。stmm 应该是 st 寄存器的别名，而 st 是 x86 的浮点运算单元 FPU(Float Point Unit)用作浮点数据处理的寄存器，x86 的 FPU 中包含一个浮点寄存器栈，它包含了 8 个 80 位的可以直接进行浮点运算的寄存器 st0 - st 7，我们可以观察到输出中的 stmm 寄存器也是 80 位的。xmm 寄存器是 128 位的，而 ymm 寄存器组则是 xmm 的 256 位扩展版本。事实上，xmm 寄存器是 ymm 寄存器的低 128 位。它们之间的关系就类似前面提到的通用寄存器中 eax 寄存器是 rax 寄存器的低 32 位。SSE 增加了新的 8 个 128 位寄存器（xmm0 - xmm7），SSE（Streaming SIMD Extensions）是 Intel 在 Pentium III 中推出的 [MMX](https://zh.wikipedia.org/wiki/MMX) 扩充的指令集。AVX(Advanced Vector Extensions) 指令集是 SSE 的扩展架构，前面提到的 128 位 xmm 寄存器提升至 256 位 ymm 寄存器，就是在 AVX 架构中引入的。
+上文已经提到在 x86-64 中有 16 个浮点数寄存器：xmm0 - xmm15，但这种说法其实隐藏了很多细节，其实在执行 `register read -a` 命令的输出结果中，读者或许已经观察到除了前面提到的 xmm 寄存器组，还有 stmm 和 ymm 寄存器组。stmm 应该是 st 寄存器的别名，而 st 是 x86 的浮点运算单元 FPU(Float Point Unit)用来处理浮点数据的寄存器，x86 的 FPU 中包含一个浮点寄存器栈，它包含了 8 个 80 位的可以直接进行浮点运算的寄存器 st0 - st7，我们可以观察到输出中的 stmm 寄存器也是 80 位的，这也证明了 stmm 其实就是 st 寄存器。xmm 寄存器是 128 位的，而 ymm 寄存器组则是 xmm 的 256 位扩展版本。其实 xmm 寄存器只不过是 ymm 寄存器的低 128 位。它们之间的关系就类似前面提到的通用寄存器中 eax 寄存器是 rax 寄存器的低 32 位。SSE（Streaming SIMD Extensions）是 Intel 在 Pentium III 中推出的 [MMX](https://zh.wikipedia.org/wiki/MMX) 扩充的指令集，SSE 增加了新的 8 个 128 位寄存器（xmm0 - xmm7）。AVX(Advanced Vector Extensions) 指令集是 SSE 的扩展架构，前面提到的 128 位 xmm 寄存器提升至 256 位 ymm 寄存器，就是在 AVX 架构中引入的。
 
 <p align="center">
 
@@ -768,6 +768,7 @@ Exception State Registers:
     frame #3: 0x00000001063840c0 UIKit`-[UIWindow addRootViewControllerViewIfPossible] + 61
     // 更多的 frame 已被省略
 ```
+
 事实上 `bt` 命令是得益于栈帧才能实现的，栈帧可以看成是函数执行的上下文，其中保存了函数的返回地址和局部变量，我们知道堆是从低地址向高地址延伸的，而栈是从高地址向低地址延伸的。每个函数的每次调用，都会分配给它一个独立的栈帧，rbp 寄存器指向当前栈帧的底部（高地址），被称作帧指针，rsp 寄存器指向栈帧的顶部（低地址），被称作栈指针。下图是栈帧的结构图：
 
 <p align="center">
@@ -793,7 +794,7 @@ TestDemo`-[ViewController viewDidLoad]:
     0x1054e09c1 <+1>:  movq   %rsp, %rbp //第五步
 ```
 
-我们很容易观察到每个函数的前两条汇编指令都是上面的这两条。图中还有一个细节就是在 rsp 寄存器下面还有一个 128 字节的红色区域，ABI 将这个区域称为红色地带，它是保留区域，不会被中断或信号改写，但是在函数调用过程中会被破坏，所以可以用于叶子函数的临时数据，叶子函数只那些不调用其他函数的函数。
+我们很容易观察到每个函数的前两条汇编指令都是上面的这两条。图中还有一个细节就是在 rsp 寄存器下面还有一个 128 字节的红色区域，ABI 将这个区域称为红色地带，它是保留区域，不会被中断或信号改写，但是在函数调用过程中会被破坏，所以可以用于叶子函数的临时数据，叶子函数指的是那些不调用其他函数的函数。
 
 ```
 UIKit`-[UIViewController loadViewIfRequired]:
@@ -805,6 +806,7 @@ UIKit`-[UIViewController loadViewIfRequired]:
     0x1064a63fb <+10>:   pushq  %r12
     0x1064a63fd <+12>:   pushq  %rbx
 ```
+
 上述汇编命令从 `0x1064a63f5` 到 `0x1064a63fd` 都属于第 6 步，在调用约定中有一类寄存器称作被调用者保存寄存器，它指的是当调用函数使用了这类寄存器，那么被调函数必须在使用之前，将它们压栈保存，然后当返回到调用函数栈帧之前，将它们出栈恢复。下面是出栈的汇编指令，可以看出 rbx 和 r12-r15 都属于这类寄存器。
 
 ```
