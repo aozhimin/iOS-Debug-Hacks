@@ -115,48 +115,47 @@ According to the `TCWebViewController` information from the trace stack, we natu
 First, we decompiled the code and got the struct of the `TCWebViewController` class
 
 ```
-  ; @class TCWebViewController : UIViewController<UIWebViewDelegate, NSURLConnectionDelegate, NSURLConnectionDataDelegate> {
-                                       ;     @property webview
-                                       ;     @property webTitle
-                                       ;     @property requestURLStr
-                                       ;     @property error
-                                       ;     @property delegate
-                                       ;     @property activityIndicatorView
-                                       ;     @property finished
-                                       ;     @property theData
-                                       ;     @property retryCount
-                                       ;     @property hash
-                                       ;     @property superclass
-                                       ;     @property description
-                                       ;     @property debugDescription
-                                       ;     ivar _nloadCount
-                                       ;     ivar _webview
-                                       ;     ivar _webTitle
-                                       ;     ivar _requestURLStr
-                                       ;     ivar _error
-                                       ;     ivar _delegate
-                                       ;     ivar _xo
-                                       ;     ivar _activityIndicatorView
-                                       ;     ivar _finished
-                                       ;     ivar _theData
-                                       ;     ivar _retryCount
-                                       ;     -setError:
-                                       ;     -initWithNibName:bundle:
-                                       ;     -dealloc
-                                       ;     -stopLoad
-                                       ;     -doClose
-                                       ;     -viewDidLoad
-                                       ;     -loadReqURL
-                                       ;     -viewDidDisappear:
-                                       ;     -shouldAutorotateToInterfaceOrientation:
-                                       ;     -supportedInterfaceOrientations
-                                       ;     -shouldAutorotate
-                                       ;     -webViewDidStartLoad:
-                                       ;     -webViewDidFinishLoad:
-                                       ;     -webView:didFailLoadWithError:
-                                       ;     -webView:shouldStartLoadWithRequest:navigationType:
-                                       ; }
-                     _OBJC_CLASS_$_TCWebViewController:
+@class TCWebViewController : UIViewController<UIWebViewDelegate, NSURLConnectionDelegate, NSURLConnectionDataDelegate> {
+    @property webview
+    @property webTitle
+    @property requestURLStr
+    @property error
+    @property delegate
+    @property activityIndicatorView
+    @property finished
+    @property theData
+    @property retryCount
+    @property hash
+    @property superclass
+    @property description
+    @property debugDescription
+    ivar _nloadCount
+    ivar _webview
+    ivar _webTitle
+    ivar _requestURLStr
+    ivar _error
+    ivar _delegate
+    ivar _xo
+    ivar _activityIndicatorView
+    ivar _finished
+    ivar _theData
+    ivar _retryCount
+    -setError:
+    -initWithNibName:bundle:
+    -dealloc
+    -stopLoad
+    -doClose
+    -viewDidLoad
+    -loadReqURL
+    -viewDidDisappear:
+    -shouldAutorotateToInterfaceOrientation:
+    -supportedInterfaceOrientations
+    -shouldAutorotate
+    -webViewDidStartLoad:
+    -webViewDidFinishLoad:
+    -webView:didFailLoadWithError:
+    -webView:shouldStartLoadWithRequest:navigationType:
+}
 ```
 From the static analysis result, there was no Setter and Getter method for `requestURLStr` in `TCWebViewController`. Because there was no such crash in previous app version, we came out an idea: would the property in `TCWebViewController` be implemented in a dynamic way which uses `@dynamic` to telll the compiler not generate getter and setter for the property during compiling time but dynamically created in runtime like **Core Data** framework? Then we decided to going deeply of the idea to see if our guess was correct. During our tracking, we found there was a category `NSObject(MethodSwizzlingCategory)` for `NSObject` in **TencentOpenAPI.framework** which was very suspicious. In this category, there was a method `switchMethodForCodeZipper` whose implemention replaced the `methodSignatureForSelector` and `forwardInvocation` methods to `QQmethodSignatureForSelector` and `QQforwardInvocation` methods.
 
@@ -1013,48 +1012,47 @@ libc++abi.dylib: terminating with uncaught exception of type NSException
 首先通过反编译工具拿到 `TCWebViewController` 类的结构
 
 ```
-  ; @class TCWebViewController : UIViewController<UIWebViewDelegate, NSURLConnectionDelegate, NSURLConnectionDataDelegate> {
-                                       ;     @property webview
-                                       ;     @property webTitle
-                                       ;     @property requestURLStr
-                                       ;     @property error
-                                       ;     @property delegate
-                                       ;     @property activityIndicatorView
-                                       ;     @property finished
-                                       ;     @property theData
-                                       ;     @property retryCount
-                                       ;     @property hash
-                                       ;     @property superclass
-                                       ;     @property description
-                                       ;     @property debugDescription
-                                       ;     ivar _nloadCount
-                                       ;     ivar _webview
-                                       ;     ivar _webTitle
-                                       ;     ivar _requestURLStr
-                                       ;     ivar _error
-                                       ;     ivar _delegate
-                                       ;     ivar _xo
-                                       ;     ivar _activityIndicatorView
-                                       ;     ivar _finished
-                                       ;     ivar _theData
-                                       ;     ivar _retryCount
-                                       ;     -setError:
-                                       ;     -initWithNibName:bundle:
-                                       ;     -dealloc
-                                       ;     -stopLoad
-                                       ;     -doClose
-                                       ;     -viewDidLoad
-                                       ;     -loadReqURL
-                                       ;     -viewDidDisappear:
-                                       ;     -shouldAutorotateToInterfaceOrientation:
-                                       ;     -supportedInterfaceOrientations
-                                       ;     -shouldAutorotate
-                                       ;     -webViewDidStartLoad:
-                                       ;     -webViewDidFinishLoad:
-                                       ;     -webView:didFailLoadWithError:
-                                       ;     -webView:shouldStartLoadWithRequest:navigationType:
-                                       ; }
-                     _OBJC_CLASS_$_TCWebViewController:
+@class TCWebViewController : UIViewController<UIWebViewDelegate, NSURLConnectionDelegate, NSURLConnectionDataDelegate> {
+    @property webview
+    @property webTitle
+    @property requestURLStr
+    @property error
+    @property delegate
+    @property activityIndicatorView
+    @property finished
+    @property theData
+    @property retryCount
+    @property hash
+    @property superclass
+    @property description
+    @property debugDescription
+    ivar _nloadCount
+    ivar _webview
+    ivar _webTitle
+    ivar _requestURLStr
+    ivar _error
+    ivar _delegate
+    ivar _xo
+    ivar _activityIndicatorView
+    ivar _finished
+    ivar _theData
+    ivar _retryCount
+    -setError:
+    -initWithNibName:bundle:
+    -dealloc
+    -stopLoad
+    -doClose
+    -viewDidLoad
+    -loadReqURL
+    -viewDidDisappear:
+    -shouldAutorotateToInterfaceOrientation:
+    -supportedInterfaceOrientations
+    -shouldAutorotate
+    -webViewDidStartLoad:
+    -webViewDidFinishLoad:
+    -webView:didFailLoadWithError:
+    -webView:shouldStartLoadWithRequest:navigationType:
+}
 ```
 
 静态分析的结果发现 `TCWebViewController` 类中确实没有 `requestURLStr` 的 Setter 和 Getter 方法。因为之前版本没有出现崩溃，
