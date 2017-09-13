@@ -36,6 +36,49 @@ The following graph is the nine debugging rules described in book <Debugging: Th
 
 </p>
 
+## Assembly Language
+
+> Although assembly lanuage is not compulsory for iOS developers, learning about it is very helpful, especially when debugging a system framework or a third-party framework.
+
+Asssembly Language is a low-level machine-oriented programming language, which can be understood as a family of variety machine instructions set of CPU. Programmer can use assembly language to control the computer hardware system directly. Systems developed by assembly language have many merits, like fast execution speed and less memory occupied.
+
+So far, two major architectures are widely used on Apple platform, x86 and ARM. And on mobile devices, ARM, which is based on a reduced instruction set computing (RISC) architecture, is used because its low power cost. But on laptop platform like Mac OS, x86 architecture is used. The Apps installed on iOS simulator is actually running as a Mac OS App inside the simulator, which means simulator is working like a container. Thus, when debugging based on simulator, the **x86** architecture is used. And that's what we are going to focus in this article.
+
+### AT&T and Intel
+
+X86 assembly language evolves into two branches: Intel (orignially used in the document of X86 platform) and AT&T. Intel plays a leading way on MS-DOS and Windows platforms. And AT&T is widely used in UNIX family. There is a huge difference on syntax between Intel and AT&T, like variable, constant, the access of registers, indirect addressing and offset. Although their syntax difference is enormous, the hardware system is the same which means one of them can be migrated to the other seamlessly. Since AT&T assembly language is used on Xcode, we will focus on **AT&T** in below part.
+
+> Please notice that Intel syntax is used on 
+the reserver tool of Hopper Disassemble and IDA Pro.
+
+Belows are the differences between Intel and AT&T:
+1. The prefix of operand: In AT&T syntax, `%` is used as the prefix of registers' name and `$` is used as the prefix of immediate operand, while no prefix is used for both registers and immediate operand in Intel. The other difference is `0x` is added as the prefix for hexadecimal in AT&T. Below chart demonstrates the difference between their prefixes:
+
+	| AT&T | Intel |
+	|:-------:|:-------:|
+	| movq %rax, %rbx | mov rbx, rax |
+	| addq $0x10, %rsp | add rsp, 010h |
+> In Intel syntax, `h` suffix is used for hexadecimal operand and `b` suffix is used for binary operand.
+
+2. Operand: In AT&T syntax, the first operand is source operand, the second operand is destination operand. However, in Intel syntax, the order of operand is opposite. From this point, the syntax of AT&T is more comfortable for us according to our reading habit.
+3. Addressing Mode: Comparing with Intel syntax, the indirect addressing mode of AT&T is hard to read. However, the algorithm of address calcuation is the same: `address = disp + base + index * scale`. `base` represents the base address, `disp` stands for offset address, `index * scale` determins the location of an element, `scale` is the size of an element which can only be a power of two. `disp/base/index/scale` are all optional, the default value of `index` is 0, while the default value of `scale` is 1. Now let's see the instruction of address calcluation: `%segreg: disp(base,index,scale)` is for AT&T, and `segreg: [base+index*scale+disp]` is for Intel. In fact, above two instructions both belong to segment addressing mode. `segreg` stands for segment register which is usually used in real mode when the digit capacity of CPU addressing beyonds the register' digit. For example, CPU can address 20-bit space, but the register only has 16-bit. To achive 20-digit space, another addressing mode needs to be used: `segreg:offset`. With this addressing mode, the offset address will be `segreg * 16 + offset`, but it's more complicated than flat memory mode. In protect mode, the addressing is under linear address space, which means segment base address can be ignored.
+
+	| AT&T | Intel |
+	|:-------:|:-------:|
+	| movq 0xb57751(%rip), %rsi | mov rsi, qword ptr [rip+0xb57751h] |
+	| leaq (%rax,%rbx,8), %rdi | lea rdi, qword ptr [rax+rbx*8] |
+	
+> If immediate operand comes at the place of `disp` or `scale`, `$` suffix can be omitted. In Intel syntax, `byte ptr`, `word ptr`, `dword ptr` and `qword ptr` need to be added before the memory operand.
+
+4. Suffix of opcode: In AT&T syntax, all opcodes have a suffix to specify the size. There are generally four kinds of suffixes:`b`,`w`,`l` and `q`. `b`represents 8-bit byte, `w` means 16-bit word, `l` means 32-bit double word. 32-digit word is also called as long word which is from the  16-bit days. `q` represents 64-bit quadword. Below chart illustrates the syntax of data transition instruction(mov) in AT&T and Intel.
+
+	| AT&T | Intel |
+	|:-------:|:-------:|
+	| movb %al, %bl | mov bl, al |
+	| movw %ax, %bx | mov bx, ax |
+	| movl %eax, %ebx | mov ebx, eax |
+	| movq %rax, %rbx | mov rbx, rax |
+
 ## Case
 
 This article illustrates the procedure of debugging through a real case. Some of the details are changed to protect personal privacy.
