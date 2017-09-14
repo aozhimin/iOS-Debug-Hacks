@@ -91,7 +91,7 @@ Below chart illustrates the 16 general registers of x86-64:
 
 <p align="center">
 
-<img src="Images/general_register.png" height=700 />
+<img src="Images/general_register_en.png" height=700 />
 
 </p>
 
@@ -241,7 +241,7 @@ As we know, there are 16 floating pointer registers in x86-64: xmm0 - xmm15. In 
 
 <p align="center">
 
-<img src="Images/float_register.png" />
+<img src="Images/float_register_en.png" />
 
 </p>
 
