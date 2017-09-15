@@ -245,6 +245,186 @@ As we know, there are 16 floating pointer registers in x86-64: xmm0 - xmm15. In 
 
 </p>
 
+### Function
+A function calling includes parameter passing and control transfer from one compilation unit to another. In function calling procedure, data passing, local variable assignment and release are carried out by stack. And the stacks assigned for a single function calling are called Stack Frame.
+
+> The function calling convention of OS X x86-64 is the same with the convention described in the article: [System V Application Binary Interface AMD64 Architecture Processor Supplement](http://www.ucw.cz/~hubicka/papers/abi/). Therefore you can refer to it if you are interested in it.
+
+#### The Stack Frame
+
+During LLDB debugging, we may use `bt` command to print the stack trace of the current thread, like below:
+
+```
+(lldb) bt
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+  * frame #0: 0x00000001054e09d4 TestDemo`-[ViewController viewDidLoad](self=0x00007fd349558950, _cmd="viewDidLoad") at ViewController.m:18
+    frame #1: 0x00000001064a6931 UIKit`-[UIViewController loadViewIfRequired] + 1344
+    frame #2: 0x00000001064a6c7d UIKit`-[UIViewController view] + 27
+    frame #3: 0x00000001063840c0 UIKit`-[UIWindow addRootViewControllerViewIfPossible] + 61
+    // many other frames are ommitted here
+```
+
+In fact, `bt` command is workable upon stack frame. The stack frame preserves return address and local variable for functions which can be seen as a context of a function execution. As we know, the heap grows upward, while the stack grows downward which is from large-numbered memory addresses to small-numbered ones. Once a function is called, one standalone stack frame is assigned for the function calling. The rbp register, called as frame pointer, always points to the end of the  latest allocated stack frame (high address). The rsp register, called as stack pointer, always points to the top of the latest allocated stack frame (low address). Below is a chart of frame stack:
+<p align="center">
+
+<img src="Images/stack_frame.png" />
+
+</p>
+
+The left column `Position` is memory address which uses indirect addressing mode. `Content` is the value of the address in `Position` points to. According to the struct of stack frame in above chart, the function calling procedure can be described as following steps:
+1. Calling function push the parameters on the stack. If there is no parameter, this step can be skipped.
+2. Push the first instruction after the function calling onto the stack which is actually the return address.
+3. Jump to the start address of the called function and execute.
+4. Called function preserves the start  address in %rbp register.
+5. Preserve the value in %rsp register to %rbp register, so that %rbp register can point to the stack frame's start address of the called function.
+6. Push the called function's register on the stack. This is optional.
+
+Step 2 and 3 actually belong to `call` instruction. In addition, step 4 and step 5 can be described in assembly instruction as following:
+
+```
+TestDemo`-[ViewController viewDidLoad]:
+    0x1054e09c0 <+0>:  pushq  %rbp //step 4
+    0x1054e09c1 <+1>:  movq   %rsp, %rbp //step 5
+```
+
+It's easy to notice that these two steps are along with each function calling. There is another detail in above chart: there is a red area below rsp register, which is called as Red Zone by ABI. It is a reserved and shall not be modified by signal or interrupt handlers. Since it can be modified during function calling, therefore, leaf functions which means those functions that never call other functions can use this area for temporary data. 
+
+```
+UIKit`-[UIViewController loadViewIfRequired]:
+    0x1064a63f1 <+0>:    pushq  %rbp
+    0x1064a63f2 <+1>:    movq   %rsp, %rbp
+    0x1064a63f5 <+4>:    pushq  %r15
+    0x1064a63f7 <+6>:    pushq  %r14
+    0x1064a63f9 <+8>:    pushq  %r13
+    0x1064a63fb <+10>:   pushq  %r12
+    0x1064a63fd <+12>:   pushq  %rbx
+```
+
+Among above instructions, instruction from `0x1064a63f5` to `0x1064a63fd` belong to step 6. There is a kind of registers called called function preserve register which mean they belong to calling function, but the called function is required to preserve their values. From below assembly instructions, we can see rbx, rsp and r12 - r15 all belong to such registers.
+
+```
+    0x1064a6c4b <+2138>: addq   $0x1f8, %rsp              ; imm = 0x1F8 
+    0x1064a6c52 <+2145>: popq   %rbx
+    0x1064a6c53 <+2146>: popq   %r12
+    0x1064a6c55 <+2148>: popq   %r13
+    0x1064a6c57 <+2150>: popq   %r14
+    0x1064a6c59 <+2152>: popq   %r15
+    0x1064a6c5b <+2154>: popq   %rbp
+    0x1064a6c5c <+2155>: retq   
+    0x1064a6c5d <+2156>: callq  0x106d69e9c               ; symbol stub for: __stack_chk_fail
+```
+
+#### Call instruction
+The instruction to call a function is `call`, refer to below:
+
+```
+call function
+```
+`function` in the parameter is the procedures in **TEXT** segment. `Call` instruction can split into two steps. The first step is to push the next instruction address of `call` instruction on stack. Here, the next address is actually the return address after the called function is finished. The second step is jump to `function`. `call` instruction is equivalent to below two instructions:
+
+```
+push next_instruction
+jmp  function
+```
+
+Following is the example of `call` instruction in iOS simulator:
+
+```
+    0x10915c714 <+68>:  callq  0x1093ca502               ; symbol stub for: objc_msgSend
+    0x105206433 <+66>:  callq  *0xb3cd47(%rip)           ; (void *)0x000000010475e800: objc_msgSend
+```
+Above code shows two usages of `call` instruction. In the first usage, the operand is a memory address which is actually a Symbol Stub of a Mach-O file. It can search the symbol of a function through the dynamical linker. In the second usage, the operand is actually obtained by indirect addressing mode. Furthermore, in AT&T syntax, `*` needs to be added to the immediate operand in the jump/call instruction(or the jumps related with programmer counter) as a prefix.
+
+#### Ret instruction
+
+In general, `ret` instruction is used to return the procudure from the called function to the calling function. This instruction pops the address from the top of stack and jump back to that address and keep executing. In above example, it jumps back to `next_instruction`. Before `ret` instruction is executed, the registers belong to calling function will be poped. This is already mentioned in the step 6 of function calling procedure. 
+
+
+#### Parameter passing and return value
+Most of the functions have parameter which can be integer, float, pointer and so on. Besides, functions usually have return value which can indicate the execution result is succeed or failed. In OSX, at most 6 parameters can be passed through registers which are rdi, rsi, rdx, rcx, r8 and r9 in order. How about a function with more than 6 parameters? Of course, this circumstance exists. If this happens, stack can be used to preserve the remaing parameters in reversed order. OSX has eighter floating point registers which allows to pass up to 8 float parameters.
+
+About the return value of a function, `rax` register is used to save the integal return value. If the return value is a float, xmm0 - xmm1 registers shall be used. Below chart clearly illustrates the register usage convention during the function calling.
+
+<p align="center">
+
+<img src="Images/register_usage.png" />
+
+</p>
+
+`preserved across function calls` indicates whether the register needs to be preserved across function calls. We can see that besides rbx, r12 - r15 registers mentioned above, rsp and rbp registers also belong to callee-saved registers. This is because these two registers reserve the important location pointers that point to the program stack. 
+
+Next we'll follow a real example to demonstrate the instructions of a function call. Take the macro `DDLogError` in `CocoaLumberjack` as example. When this macro is called, class method `log:level:flag:context:file:function:line:tag:format:` is called. Following code and instructions are about the call of `DDLogError` and the corresponding assembly instructions:
+
+```
+- (IBAction)test:(id)sender {
+    DDLogError(@"TestDDLog:%@", sender);
+}
+```
+
+```
+    0x102c568a3 <+99>:  xorl   %edx, %edx
+    0x102c568a5 <+101>: movl   $0x1, %eax
+    0x102c568aa <+106>: movl   %eax, %r8d
+    0x102c568ad <+109>: xorl   %eax, %eax
+    0x102c568af <+111>: movl   %eax, %r9d
+    0x102c568b2 <+114>: leaq   0x2a016(%rip), %rcx       ; "/Users/dev-aozhimin/Desktop/TestDDLog/TestDDLog/ViewController.m"
+    0x102c568b9 <+121>: leaq   0x2a050(%rip), %rsi       ; "-[ViewController test:]"
+    0x102c568c0 <+128>: movl   $0x22, %eax
+    0x102c568c5 <+133>: movl   %eax, %edi
+    0x102c568c7 <+135>: leaq   0x2dce2(%rip), %r10       ; @"\eTestDDLog:%@"
+    0x102c568ce <+142>: movq   0x33adb(%rip), %r11       ; (void *)0x0000000102c8ad18: DDLog
+    0x102c568d5 <+149>: movq   0x34694(%rip), %rbx       ; ddLogLevel
+    0x102c568dc <+156>: movq   -0x30(%rbp), %r14
+    0x102c568e0 <+160>: movq   0x332f9(%rip), %r15       ; "log:level:flag:context:file:function:line:tag:format:"
+    0x102c568e7 <+167>: movq   %rdi, -0x48(%rbp)
+    0x102c568eb <+171>: movq   %r11, %rdi
+    0x102c568ee <+174>: movq   %rsi, -0x50(%rbp)
+    0x102c568f2 <+178>: movq   %r15, %rsi
+    0x102c568f5 <+181>: movq   %rcx, -0x58(%rbp)
+    0x102c568f9 <+185>: movq   %rbx, %rcx
+    0x102c568fc <+188>: movq   -0x58(%rbp), %r11
+    0x102c56900 <+192>: movq   %r11, (%rsp)
+    0x102c56904 <+196>: movq   -0x50(%rbp), %rbx
+    0x102c56908 <+200>: movq   %rbx, 0x8(%rsp)
+    0x102c5690d <+205>: movq   $0x22, 0x10(%rsp)
+    0x102c56916 <+214>: movq   $0x0, 0x18(%rsp)
+    0x102c5691f <+223>: movq   %r10, 0x20(%rsp)
+    0x102c56924 <+228>: movq   %r14, 0x28(%rsp)
+    0x102c56929 <+233>: movb   $0x0, %al
+    0x102c5692b <+235>: callq  0x102c7d2be               ; symbol stub for: objc_msgSend
+```
+
+Since all functions in Objective-C will turn into the invocation of `objc_msgSend` function, so `log:level:flag:context:file:function:line:tag:format:` method finally turn into below codes:
+
+```
+objc_msgSend(DDLog, @selector(log:level:flag:context:file:function:line:tag:format:), asynchronous, level, flag, context, file, function, line, tag, format, sender)
+```
+
+We already mentioned at most 6 registers can be used for parameter passing. The excess parameters can use stack to do the passing. Since above function has more than 6 parameters, the parameter passing would use both registers and stack. Below two tables describe the detail usage of registers and stack for the parameter passing of `DDLogError` function invocation.
+
+| General Register | value | Parameters | Assembly Instructions | Comment |
+|:-------:|:-------:|:-------:|:-------:|:-------:|
+| rdi | DDLog | self | 0x102c568eb <+171>: movq   %r11, %rdi | |
+| rsi | "log:level:flag:context:file:function:line:tag:format:" | op | 0x102c568f2 <+178>: movq   %r15, %rsi | |
+| rdx | 0 | asynchronous | 0x102c568a3 <+99>:  xorl   %edx, %edx | xorl is an exclusive-OR operation. Here it's used to clear the edx register |
+| rcx | 18446744073709551615 | level | 0x102c568f9 <+185>: movq   %rbx, %rcx | (DDLogLevelAll or NSUIntegerMax) |
+| r8 | 1 | flag | 0x102c568aa <+106>: movl   %eax, %r8d | DDLogFlagError |
+| r9 | 0 | context | 0x102c568af <+111>: movl   %eax, %r9d | |
+
+| Stack Frame Offset | Value | Parameters | Assembly Instructions | Comment |
+|:-------:|:-------:|:-------:|:-------:|:-------:|
+| (%rsp) | "/Users/dev-aozhimin/Desktop/TestDDLog/TestDDLog/ViewController.m" | file | 0x102c56900 <+192>: movq   %r11, (%rsp) | |
+| 0x8(%rsp) | "-[ViewController test:]" | function | 0x102c56908 <+200>: movq   %rbx, 0x8(%rsp) | |
+| 0x10(%rsp) | 0X22 | line | 0x102c5690d <+205>: movq   $0x22, 0x10(%rsp) | The corresponding invocation of DDLogError is in Line 34 |
+| 0x18(%rsp) | 0X0 | tag | 0x102c56916 <+214>: movq   $0x0, 0x18(%rsp) | nil |
+| 0x20(%rsp) | "TestDDLog:%@" | format | 0x102c5691f <+223>: movq   %r10, 0x20(%rsp) | |
+| 0x28(%rsp) | sender | The first parameter of variable parameters | 0x102c56924 <+228>: movq   %r14, 0x28(%rsp) | A instance of UIButton |
+
+> If the value in register is a string, like `op` paramter in `rsi` register, the string can be printed directly in LLDB through `po (char *) $rsi` command. Else, `po $rsi` can be used to print a value in integer format.
+
+With the help of assembly language, we can look into some low-level knowledge which is very necessary during debugging. I try very hard to introduce the assembly related knowledge as detailed as I can. However, the knowledge hierarchy of assembly is too enormous to describle in one article. Please refer to the references mentioned above. In addition, the third chapter of **CSAPP** -- Machine level representation of a program  is highly recommended too. It's a rare good material for reference.
+
+
 ## Case
 
 This article illustrates the procedure of debugging through a real case. Some of the details are changed to protect personal privacy.
