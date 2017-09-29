@@ -8,7 +8,7 @@
 
 > Debugging has a rather bad reputation. I mean, if the developer had a complete understanding of the program, there wouldn’t be any bugs and they wouldn’t be debugging in the first place, right?<br/>Don’t think like that.<br/>There are always going to be bugs in your software — or any software, for that matter. No amount of test coverage imposed by your product manager is going to fix that. In fact, viewing debugging as just a process of fixing something that’s broken is actually a poisonous way of thinking that will mentally hinder your analytical abilities.<br/>Instead, you should view debugging **as simply a process to better understand a program**. It’s a subtle difference, but if you truly believe it, any previous drudgery of debugging simply disappears.
 
-Since Grace Hopper, the founder of the **Cobol** language, discovered the world's first Bug in a relay computer, the generation of Bug in software development has never stopped. As the preface to the book of《Advanced Apple Debugging & Reverse Engineering》tells us: Developers don't want to think that if there is a good understanding of how software works, there will be no Bug. Therefore, debugging is almost a inevitable phase in the software development life cycle.
+Since Grace Hopper, the founder of the **Cobol** language, discovered the world's first Bug in a relay computer, the generation of Bug in software development has never stopped. As the preface to the book of《Advanced Apple Debugging & Reverse Engineering》tells us: Developers don't want to think that if there is a good understanding of how software works, there will be no Bug. Therefore, debugging is almost an inevitable phase in the software development life cycle.
 
 ## Debugging Overview
 
@@ -16,7 +16,7 @@ If you ask an inexperienced programmer
  about how to define debugging, he might say "Debugging is something you do to find a solution for your software problem". He is right, but that's just a tiny part of a real debugging.
 
 Here are the steps of a real debugging:
-1. Find out why it's behaving unexpectly
+1. Find out why it's behaving unexpectedly
 2. Resolve it
 3. Try to make sure no new issue is involved
 4. Improve the quality of your code, include readability, architecture, test coverage and performance etc.
@@ -26,7 +26,7 @@ Among above steps, the most important step is the first step: find out the probl
 
 Research shows the time experienced programmers spend on debugging to locate the same set of defects is about one twentieth of inexperienced programmers. That means debugging experience makes an enormous difference on programming efficiency. We have lots of books on software design, unfortunately, rare of them have introduction about debugging, even the courses in school.
 
-As the debugger improving over years, the programmers' coding style are changed thoroughly. But still，a good debugger cannot replace good debugging thought. In contrast, excellent debugging thought is not enough without good debugger. The perfect thing is we have both of them.
+As the debugger improving over years, the programmers' coding style is changed thoroughly. But still，a good debugger cannot replace good debugging thought. In contrast, excellent debugging thought is not enough without good debugger. The perfect thing is we have both of them.
 
 The following graph is the nine debugging rules described in book <Debugging: The 9 Indispensable Rules for Finding Even the Most Elusive Software and Hardware Problems>.
 
@@ -38,30 +38,31 @@ The following graph is the nine debugging rules described in book <Debugging: Th
 
 ## Assembly Language
 
-> Although assembly lanuage is not compulsory for iOS developers, learning about it is very helpful, especially when debugging a system framework or a third-party framework.
+> Although assembly language is not compulsory for iOS developers, learning about it would be extremely useful, especially when debugging a system framework or a third-party framework.
 
 Asssembly Language is a low-level machine-oriented programming language, which can be understood as a family of variety machine instructions set of CPU. Programmer can use assembly language to control the computer hardware system directly. Systems developed by assembly language have many merits, like fast execution speed and less memory occupied.
 
-So far, two major architectures are widely used on Apple platform, x86 and ARM. And on mobile devices, ARM, which is based on a reduced instruction set computing (RISC) architecture, is used because its low power cost. But on laptop platform like Mac OS, x86 architecture is used. The Apps installed on iOS simulator is actually running as a Mac OS App inside the simulator, which means simulator is working like a container. Thus, when debugging based on simulator, the **x86** architecture is used. And that's what we are going to focus in this article.
+So far, two major architectures are widely used on Apple platform, x86 and ARM. And on mobile devices, ARM, which is based on a reduced instruction set computing (RISC) architecture, is used because its low power cost. But on laptop platforms like Mac OS, x86 architecture is used. The Apps installed on iOS simulators is actually running as a Mac OS App inside the simulator, which means simulator is working like a container. Thus, when debugging based on simulators, the **x86** architecture is used. And that's what we are going to focus in this article.
 
 ### AT&T and Intel
 
 X86 assembly language evolves into two branches: Intel (orignially used in the document of X86 platform) and AT&T. Intel plays a leading way on MS-DOS and Windows platforms. And AT&T is widely used in UNIX family. There is a huge difference on syntax between Intel and AT&T, like variable, constant, the access of registers, indirect addressing and offset. Although their syntax difference is enormous, the hardware system is the same which means one of them can be migrated to the other seamlessly. Since AT&T assembly language is used on Xcode, we will focus on **AT&T** in below part.
 
 > Please notice that Intel syntax is used on 
-the reserver tool of Hopper Disassemble and IDA Pro.
+the disassembly tools of Hopper Disassemble and IDA Pro.
 
 Belows are the differences between Intel and AT&T:
-1. The prefix of operand: In AT&T syntax, `%` is used as the prefix of registers' name and `$` is used as the prefix of immediate operand, while no prefix is used for both registers and immediate operand in Intel. The other difference is `0x` is added as the prefix for hexadecimal in AT&T. Below chart demonstrates the difference between their prefixes:
+1. The prefix of operand: In AT&T syntax, `%` is used as the prefix of registers' name and `$` is used as the prefix of immediate operand, while no prefix is used for both registers and immediate operand in Intel. The other difference is `0x` is added as the prefix for hexadecimal in AT&T. The chart below demonstrates the difference between their prefixes:
 
 	| AT&T | Intel |
 	|:-------:|:-------:|
 	| movq %rax, %rbx | mov rbx, rax |
 	| addq $0x10, %rsp | add rsp, 010h |
+
 > In Intel syntax, `h` suffix is used for hexadecimal operand and `b` suffix is used for binary operand.
 
 2. Operand: In AT&T syntax, the first operand is source operand, the second operand is destination operand. However, in Intel syntax, the order of operand is opposite. From this point, the syntax of AT&T is more comfortable for us according to our reading habit.
-3. Addressing Mode: Comparing with Intel syntax, the indirect addressing mode of AT&T is hard to read. However, the algorithm of address calcuation is the same: `address = disp + base + index * scale`. `base` represents the base address, `disp` stands for offset address, `index * scale` determins the location of an element, `scale` is the size of an element which can only be a power of two. `disp/base/index/scale` are all optional, the default value of `index` is 0, while the default value of `scale` is 1. Now let's see the instruction of address calcluation: `%segreg: disp(base,index,scale)` is for AT&T, and `segreg: [base+index*scale+disp]` is for Intel. In fact, above two instructions both belong to segment addressing mode. `segreg` stands for segment register which is usually used in real mode when the digit capacity of CPU addressing beyonds the register' digit. For example, CPU can address 20-bit space, but the register only has 16-bit. To achive 20-digit space, another addressing mode needs to be used: `segreg:offset`. With this addressing mode, the offset address will be `segreg * 16 + offset`, but it's more complicated than flat memory mode. In protect mode, the addressing is under linear address space, which means segment base address can be ignored.
+3. Addressing Mode: Comparing with Intel syntax, the indirect addressing mode of AT&T is hard to read. However, the algorithm of address calculation is the same: `address = disp + base + index * scale`. `base` represents the base address, `disp` stands for offset address, `index * scale` determines the location of an element, `scale` is the size of an element which can only be a power of two. `disp/base/index/scale` are all optional, the default value of `index` is 0, while the default value of `scale` is 1. Now let's see the instruction of address calculation: `%segreg: disp(base,index,scale)` is for AT&T, and `segreg: [base+index*scale+disp]` is for Intel. In fact, above two instructions both belong to segment addressing mode. `segreg` stands for segment register which is usually used in real mode when the digit capacity of CPU addressing beyonds the register' digit. For example, CPU can address 20-bit space, but the register only has 16-bit. To achieve 20-digit space, another addressing mode needs to be used: `segreg:offset`. With this addressing mode, the offset address will be `segreg * 16 + offset`, but it's more complicated than flat memory mode. In protect mode, the addressing is under linear address space, which means segment base address can be ignored.
 
 	| AT&T | Intel |
 	|:-------:|:-------:|
@@ -70,7 +71,7 @@ Belows are the differences between Intel and AT&T:
 	
 > If immediate operand comes at the place of `disp` or `scale`, `$` suffix can be omitted. In Intel syntax, `byte ptr`, `word ptr`, `dword ptr` and `qword ptr` need to be added before the memory operand.
 
-4. Suffix of opcode: In AT&T syntax, all opcodes have a suffix to specify the size. There are generally four kinds of suffixes:`b`,`w`,`l` and `q`. `b`represents 8-bit byte, `w` means 16-bit word, `l` means 32-bit double word. 32-digit word is also called as long word which is from the  16-bit days. `q` represents 64-bit quadword. Below chart illustrates the syntax of data transition instruction(mov) in AT&T and Intel.
+4. Suffix of opcode: In AT&T syntax, all opcodes have a suffix to specify the size. There are generally four kinds of suffixes:`b`,`w`,`l` and `q`. `b`represents 8-bit byte, `w` means 16-bit word, `l` means 32-bit double word. 32-digit word is also called as long word which is from the 16-bit days. `q` represents 64-bit quadword. The chart below illustrates the syntax of data transition instruction(mov) in AT&T and Intel.
 
 	| AT&T | Intel |
 	|:-------:|:-------:|
@@ -78,14 +79,16 @@ Belows are the differences between Intel and AT&T:
 	| movw %ax, %bx | mov bx, ax |
 	| movl %eax, %ebx | mov ebx, eax |
 	| movq %rax, %rbx | mov rbx, rax |
-### Register
-As we know, Memory is used to store instructions and data for CPU. Essentially memory is an byte array. Although the speed of memory access is very fast, we still need a smaller and faster storage unit to speed up the CPU's instruction execution, which is register. During the instruction execution, all data are temporarily stored in registers. That's why register is named in.
 
-When processor grows from 16-bit to 32-bit, 8 registers are extended to 32-bit too. After that, when the extended registers are used, `E` prefix is added to the orginial register name. 32-bit processor is Intel Architecture 32-bit, which is IA32. Today, the main processors are 64-bit Intel architecture, which is extended from IA32 and been called x86-64. Since IA32 is past, this article will only focus on x86-64. Note that in x86-64, the amount of registers are extended from 8 to 16. Just because of this extension, the program state can be stored in registers but not stacks. Thus, the frequency of memory access are hugely recuded.
+### Register
+
+As we know, Memory is used to store instructions and data for CPU. Memory is essentially an array of bytes. Although the speed of memory access is very fast, we still need a smaller and faster storage unit to speed up the CPU's instruction execution, which is register. During the instruction execution, all data are temporarily stored in registers. That's why register is named in.
+
+When processors grows from 16-bit to 32-bit, 8 registers are extended to 32-bit too. After that, when the extended registers are used, `E` prefix is added to the original register name. 32-bit processor is Intel Architecture 32-bit, which is IA32. Today, the main processors are 64-bit Intel architecture, which is extended from IA32 and been called x86-64. Since IA32 is past, this article will only focus on x86-64. Note that in x86-64, the amount of registers is extended from 8 to 16. Just because of this extension, the program state can be stored in registers but not stacks. Thus, the frequency of memory access is hugely reduced.
 
 In x86-64, there are 16 64-bit general registers and 16 floating pointer registers. Besides, CPU has one more 64-bit instruction pointer register called `rip`. It is designed to store the address of the next executed instruction. There are also some other registers which are not widely used, we don't intend to talk about them in this article. Among the 16 general registers, eight of them are from the IA32: rax、rcx、rdx、rbx、rsi、rdi、rsp and rbp. The other eight general registers are new added since x86-64 which are r8 - r15. The 16 floating registers are xmm0 - xmm15.
 
-Current CPUs are from 8088, the register are also extended from 16-bit to 32-bit and finally to 64-bit. Thus, the program can still access the low 8-bit or 16-bit or 32-bit of the registers. 
+Current CPUs are from 8088, the register is also extended from 16-bit to 32-bit and finally to 64-bit. Thus, the program can still access the low 8-bit or 16-bit or 32-bit of the registers. 
 
 Below chart illustrates the 16 general registers of x86-64:
 
@@ -237,7 +240,7 @@ Exception State Registers:
   faultvaddr = 0x000000010bb91000  
 ```
 
-As we know, there are 16 floating pointer registers in x86-64: xmm0 - xmm15. In fact, there are some other details of it. In the output of `register read -a` command, you may notice that there have stmm and ymm registers besides xmm register group. Here stmm is an alias of st register, and st is a register of FPU(Float Point Unit) in x86 to handle float data. The FPU contains one float pointer register which has eight 80-bit float pointer register: st0 - st7. We can observe that the stmm register is 80-bit from the output, which can prove the stmm register is st register. xmm is 128-bit register, and ymm register is 256-bit which is an extension of xmm. In fact, xmm register is the low 128-bit of ymm register. Like the eax register is the low 32-bit of rax register. In Pentium III, Intel published an instruction set called SSE(Streaming SIMD Extensions) which is an extension of [MMX](https://zh.wikipedia.org/wiki/MMX). Eight new 128-bit registers(xmm0 - xmm7) are added in SSE. AVX(Advanced Vector Extensions) instruction set is an extension architecture of SSE. Also in AVX, the 128-bit register xmm was extended to 256-bit register ymm. 
+As we know, there are 16 floating pointer registers in x86-64: xmm0 - xmm15. In fact, there are some other details of it. In the output of `register read -a` command, you may notice that there have stmm and ymm registers besides xmm register group. Here stmm is an alias of st register, and st is a register of FPU(Float Point Unit) in x86 to handle float data. The FPU contains one float pointer register which has eight 80-bit float pointer registers: st0 - st7. We can observe that the stmm register is 80-bit from the output, which can prove the stmm register is st register. xmm is 128-bit register, and ymm register is 256-bit which is an extension of xmm. In fact, xmm register is the low 128-bit of ymm register. Like the eax register is the low 32-bit of rax register. In Pentium III, Intel published an instruction set called SSE(Streaming SIMD Extensions) which is an extension of [MMX](https://zh.wikipedia.org/wiki/MMX). Eight new 128-bit registers(xmm0 - xmm7) are added in SSE. AVX(Advanced Vector Extensions) instruction set is an extension architecture of SSE. Also in AVX, the 128-bit register xmm was extended to 256-bit register ymm. 
 
 <p align="center">
 
@@ -246,7 +249,8 @@ As we know, there are 16 floating pointer registers in x86-64: xmm0 - xmm15. In 
 </p>
 
 ### Function
-A function calling includes parameter passing and control transfer from one compilation unit to another. In function calling procedure, data passing, local variable assignment and release are carried out by stack. And the stacks assigned for a single function calling are called Stack Frame.
+
+A function calling includes parameter passing and control transfer from one compilation unit to another. In function calling procedure, data passing, local variable assignment and release are carried out by stack. And the stacks assigned to a single function calling are called Stack Frame.
 
 > The function calling convention of OS X x86-64 is the same with the convention described in the article: [System V Application Binary Interface AMD64 Architecture Processor Supplement](http://www.ucw.cz/~hubicka/papers/abi/). Therefore you can refer to it if you are interested in it.
 
@@ -271,15 +275,15 @@ In fact, `bt` command is workable upon stack frame. The stack frame preserves re
 
 </p>
 
-The left column `Position` is memory address which uses indirect addressing mode. `Content` is the value of the address in `Position` points to. According to the struct of stack frame in above chart, the function calling procedure can be described as following steps:
-1. Calling function push the parameters on the stack. If there is no parameter, this step can be skipped.
+The left column `Position` is memory address which uses indirect addressing mode. `Content` is the value of the address in `Position` points to. According to the struct of stack frame in above chart, the function calling procedure can be described as several steps as follows:
+1. Calling function pushes the parameters on the stack. If there is no parameter, this step can be skipped.
 2. Push the first instruction after the function calling onto the stack which is actually the return address.
 3. Jump to the start address of the called function and execute.
 4. Called function preserves the start  address in %rbp register.
 5. Preserve the value in %rsp register to %rbp register, so that %rbp register can point to the stack frame's start address of the called function.
 6. Push the called function's register on the stack. This is optional.
 
-Step 2 and 3 actually belong to `call` instruction. In addition, step 4 and step 5 can be described in assembly instruction as following:
+Step 2 and 3 actually belong to `call` instruction. In addition, step 4 and step 5 can be described in assembly instruction as follows:
 
 ```
 TestDemo`-[ViewController viewDidLoad]:
@@ -287,7 +291,7 @@ TestDemo`-[ViewController viewDidLoad]:
     0x1054e09c1 <+1>:  movq   %rsp, %rbp //step 5
 ```
 
-It's easy to notice that these two steps are along with each function calling. There is another detail in above chart: there is a red area below rsp register, which is called as Red Zone by ABI. It is a reserved and shall not be modified by signal or interrupt handlers. Since it can be modified during function calling, therefore, leaf functions which means those functions that never call other functions can use this area for temporary data. 
+It's easy to notice that these two steps are along with each function calling. There is another detail of above chart: there is a red area below rsp register, which is called as Red Zone by ABI. It is a reserved and shall not be modified by signal or interrupt handlers. Since it can be modified during function calling, therefore, leaf functions which means those functions that never call other functions can use this area for temporary data. 
 
 ```
 UIKit`-[UIViewController loadViewIfRequired]:
@@ -300,7 +304,7 @@ UIKit`-[UIViewController loadViewIfRequired]:
     0x1064a63fd <+12>:   pushq  %rbx
 ```
 
-Among above instructions, instruction from `0x1064a63f5` to `0x1064a63fd` belong to step 6. There is a kind of registers called called function preserve register which mean they belong to calling function, but the called function is required to preserve their values. From below assembly instructions, we can see rbx, rsp and r12 - r15 all belong to such registers.
+Among above instructions, instruction from `0x1064a63f5` to `0x1064a63fd` belong to step 6. There is a kind of registers called function preserve register which means they belong to calling function, but the called function is required to preserve their values. From below assembly instructions, we can see rbx, rsp and r12 - r15 all belong to such registers.
 
 ```
     0x1064a6c4b <+2138>: addq   $0x1f8, %rsp              ; imm = 0x1F8 
@@ -337,13 +341,13 @@ Above code shows two usages of `call` instruction. In the first usage, the opera
 
 #### Ret instruction
 
-In general, `ret` instruction is used to return the procudure from the called function to the calling function. This instruction pops the address from the top of stack and jump back to that address and keep executing. In above example, it jumps back to `next_instruction`. Before `ret` instruction is executed, the registers belong to calling function will be poped. This is already mentioned in the step 6 of function calling procedure. 
-
+In general, `ret` instruction is used to return the procedure from the called function to the calling function. This instruction pops the address from the top of stack and jump back to that address and keep executing. In above example, it jumps back to `next_instruction`. Before `ret` instruction is executed, the registers belong to calling function will be poped. This is already mentioned in step 6 of function calling procedure. 
 
 #### Parameter passing and return value
-Most of the functions have parameter which can be integer, float, pointer and so on. Besides, functions usually have return value which can indicate the execution result is succeed or failed. In OSX, at most 6 parameters can be passed through registers which are rdi, rsi, rdx, rcx, r8 and r9 in order. How about a function with more than 6 parameters? Of course, this circumstance exists. If this happens, stack can be used to preserve the remaing parameters in reversed order. OSX has eighter floating point registers which allows to pass up to 8 float parameters.
 
-About the return value of a function, `rax` register is used to save the integal return value. If the return value is a float, xmm0 - xmm1 registers shall be used. Below chart clearly illustrates the register usage convention during the function calling.
+Most of the functions have parameter which can be integer, float, pointer and so on. Besides, functions usually have return value which can indicate the execution result is succeed or failed. In OSX, at most 6 parameters can be passed through registers which are rdi, rsi, rdx, rcx, r8 and r9 in order. How about a function with more than 6 parameters? Of course, this circumstance exists. If this happens, stack can be used to preserve the remaining parameters in reversed order. OSX has eight floating point registers which allow to pass up to 8 float parameters.
+
+About the return value of a function, `rax` register is used to save the integer return value. If the return value is a float, xmm0 - xmm1 registers shall be used. Below chart clearly illustrates the register usage convention during the function calling.
 
 <p align="center">
 
@@ -351,9 +355,9 @@ About the return value of a function, `rax` register is used to save the integal
 
 </p>
 
-`preserved across function calls` indicates whether the register needs to be preserved across function calls. We can see that besides rbx, r12 - r15 registers mentioned above, rsp and rbp registers also belong to callee-saved registers. This is because these two registers reserve the important location pointers that point to the program stack. 
+`preserved across function calls` indicates whether the register needs to be preserved across function call. We can see that besides rbx, r12 - r15 registers mentioned above, rsp and rbp registers also belong to callee-saved registers. This is because these two registers reserve the important location pointers that point to the program stack. 
 
-Next we'll follow a real example to demonstrate the instructions of a function call. Take the macro `DDLogError` in `CocoaLumberjack` as example. When this macro is called, class method `log:level:flag:context:file:function:line:tag:format:` is called. Following code and instructions are about the call of `DDLogError` and the corresponding assembly instructions:
+Next we'll follow a real example to demonstrate the instructions in a function call. Take the macro `DDLogError` in `CocoaLumberjack` as example. When this macro is called, class method `log:level:flag:context:file:function:line:tag:format:` is called. Following code and instructions are about the call of `DDLogError` and the corresponding assembly instructions:
 
 ```
 - (IBAction)test:(id)sender {
@@ -394,7 +398,7 @@ Next we'll follow a real example to demonstrate the instructions of a function c
     0x102c5692b <+235>: callq  0x102c7d2be               ; symbol stub for: objc_msgSend
 ```
 
-Since all functions in Objective-C will turn into the invocation of `objc_msgSend` function, so `log:level:flag:context:file:function:line:tag:format:` method finally turn into below codes:
+Since all functions of Objective-C will turn into the invocation of `objc_msgSend` function, so `log:level:flag:context:file:function:line:tag:format:` method finally turn into below codes:
 
 ```
 objc_msgSend(DDLog, @selector(log:level:flag:context:file:function:line:tag:format:), asynchronous, level, flag, context, file, function, line, tag, format, sender)
@@ -420,19 +424,18 @@ We already mentioned at most 6 registers can be used for parameter passing. The 
 | 0x20(%rsp) | "TestDDLog:%@" | format | 0x102c5691f <+223>: movq   %r10, 0x20(%rsp) | |
 | 0x28(%rsp) | sender | The first parameter of variable parameters | 0x102c56924 <+228>: movq   %r14, 0x28(%rsp) | A instance of UIButton |
 
-> If the value in register is a string, like `op` paramter in `rsi` register, the string can be printed directly in LLDB through `po (char *) $rsi` command. Else, `po $rsi` can be used to print a value in integer format.
+> If the value of register is a string, like `op` parameter in `rsi` register, the string can be printed directly in LLDB through `po (char *) $rsi` command. Else, `po $rsi` can be used to print a value in integer format.
 
-With the help of assembly language, we can look into some low-level knowledge which is very necessary during debugging. I try very hard to introduce the assembly related knowledge as detailed as I can. However, the knowledge hierarchy of assembly is too enormous to describle in one article. Please refer to the references mentioned above. In addition, the third chapter of **CSAPP** -- Machine level representation of a program  is highly recommended too. It's a rare good material for reference.
-
+With the help of assembly language, we can look into some low-level knowledge which is very necessary during debugging. I try very hard to introduce the assembly related knowledge as detailed as I can. However, the knowledge hierarchy of assembly is too enormous to describe in one article. Please refer to the references mentioned above. In addition, the third chapter of **CSAPP** -- Machine level representation of a program  is highly recommended too. It's a rare good material for reference.
 
 ## Case
 
 This article illustrates the procedure of debugging through a real case. Some of the details are changed to protect personal privacy.
 
 ### Issue
-The issue we are going to talk about was happening when I was developing a login SDK. One user claimed the app crashed when he pressed the "QQ" button in login page. As we debugged this issue, we found the crash happend if the QQ app was not installed at the same time. When user presses QQ button to require a login, the QQ login SDK tries to launch an authorization web page in our app. In this case, an unrecognized selector error `[TCWebViewController setRequestURLStr:]` occurs.
+The issue we are going to talk about was happening when I was developing a login SDK. One user claimed the app crashed when he pressed the "QQ" button in login page. As we debugged this issue, we found the crash happened if the QQ app was not installed at the same time. When user presses QQ button to require a login, the QQ login SDK tries to launch an authorization web page in our app. In this case, an unrecognized selector error `[TCWebViewController setRequestURLStr:]` occurs.
 
-> P.S: To focus on the issue, the unneccessary bussion debug information are not listed below. Meanwhile **AADebug** is used as our app name. 
+> P.S: To focus on the issue, the unnecessary business debug information is not listed below. Meanwhile **AADebug** is used as our app name. 
 
 Here is the stack trace of this crash:
 ```
@@ -477,13 +480,15 @@ Below four methods are usually involved during message forwarding:
 
 1. `+ (BOOL)resolveInstanceMethod:(SEL)sel`: this method is called when an unknown message is passed to an object. This method takes the selector that was not found and return a Boolean value to indicate whether an instance method was added to the class that can now handle that selector. If the class can handle this selector, return Yes, then the message forward process is completed. This method is often used to access @dynamic properties of NSManagedObjects in CoreData in a dynamically way. `+ (BOOL)resolveClassMethod:(SEL)sel` method is similar with above method, the only difference is this one class method, the other is instance method.
 
-2. `- (id)forwardingTargetForSelector:(SEL)aSelector`：This method provides a second receiver for handling unknow message, and it's faster than `forwardInvocation:`. This method can be used to imitate some features of multiple inheritance. Note that there is no way to manipulate the mssage using this part of the fowarding path. If the message needs to be altered before sending to the replacement receiver, the full forwarding mechanism must be used.
-3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：If the forwarding algorithm has come this far, the full forwarding mechanism is started. `NSMethodSignature` is returned by this method which includes method description in aSelector paramter. Note that this method needs to be overrided if you want to create a `NSInvocation` object which contains selector, target, and arguments during the message forwarding.
-4. `- (void)forwardInvocation:(NSInvocation *)anInvocation`：The implemention of this method must contains below parts: Find out the object which can handle anInvocation message; Sending message to that object, the anInvocation saves the return value, runtime then sends the return value to the original message sender. In fact, this method can have the same behavior with `forwardingTargetForSelector:` method by simply changing the invocation target and invoking it afterwards, but we barely do that.
+2. `- (id)forwardingTargetForSelector:(SEL)aSelector`：This method provides a second receiver for handling unknow message, and it's faster than `forwardInvocation:`. This method can be used to imitate some features of multiple inheritance. Note that there is no way to manipulate the message using this part of the forwarding path. If the message needs to be altered before sending to the replacement receiver, the full forwarding mechanism must be used.
 
-Usually, the first two methods used for message forwarding are called as **Fast Forwarding**, becuase it provides a much faster way to do the message forwarding. To distinguish from the fast forwarding, method 3 and 4 are called as **Normal Forwarding** or **Regular Forwarding**. It's much slower because it has to create **NSInvocation** object to complete the message forwarding.
+3. `- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector`：If the forwarding algorithm has come this far, the full forwarding mechanism is started. `NSMethodSignature` is returned by this method which includes method description in aSelector parameter. Note that this method needs to be overridden if you want to create a `NSInvocation` object which contains selector, target, and arguments during the message forwarding.
 
-> Note: If `methodSignatureForSelector` method is not overwrided or the returned `NSMethodSignature` is nil, `forwardInvocation` will not be called, and the message forwarding is terminated with `doesNotRecognizeSelector` error raised. We can see it from the `__forwarding__` function's source code below.
+4. `- (void)forwardInvocation:(NSInvocation *)anInvocation`：The implementation of this method must contains below parts: Find out the object which can handle anInvocation message; Sending message to that object, the anInvocation saves the return value, runtime then sends the return value to the original message sender. In fact, this method can have the same behavior with `forwardingTargetForSelector:` method by simply changing the invocation target and invoking it afterwards, but we barely do that.
+
+Usually, the first two methods used for message forwarding are called as **Fast Forwarding**, because it provides a much faster way to do the message forwarding. To distinguish from the fast forwarding, method 3 and 4 are called as **Normal Forwarding** or **Regular Forwarding**. It's much slower because it has to create **NSInvocation** object to complete the message forwarding.
+
+> Note: If `methodSignatureForSelector` method is not overridden or the returned `NSMethodSignature` is nil, `forwardInvocation` will not be called, and the message forwarding is terminated with `doesNotRecognizeSelector` error raised. We can see it from the `__forwarding__` function's source code below.
 
 The process of message forwarding can be described by a flow diagram, see below.
 
@@ -546,7 +551,7 @@ First, we decompiled the code and got the struct of the `TCWebViewController` cl
     -webView:shouldStartLoadWithRequest:navigationType:
 }
 ```
-From the static analysis result, there was no Setter and Getter method for `requestURLStr` in `TCWebViewController`. Because there was no such crash in previous app version, we came out an idea: would the property in `TCWebViewController` be implemented in a dynamic way which uses `@dynamic` to telll the compiler not generate getter and setter for the property during compiling time but dynamically created in runtime like **Core Data** framework? Then we decided to going deeply of the idea to see if our guess was correct. During our tracking, we found there was a category `NSObject(MethodSwizzlingCategory)` for `NSObject` in **TencentOpenAPI.framework** which was very suspicious. In this category, there was a method `switchMethodForCodeZipper` whose implemention replaced the `methodSignatureForSelector` and `forwardInvocation` methods to `QQmethodSignatureForSelector` and `QQforwardInvocation` methods.
+From the static analysis result, there was no Setter and Getter method of `requestURLStr` in `TCWebViewController`. Because there was no such crash in previous app version, we came out an idea: would the property in `TCWebViewController` was implemented in a dynamic way which uses `@dynamic` to tell the compiler not generates getter and setter for the property during compiling time but dynamically created in runtime like **Core Data** framework? Then we decided to going deeply of the idea to see if our guess was correct. During our tracking, we found there was a category `NSObject(MethodSwizzlingCategory)` for `NSObject` in **TencentOpenAPI.framework** which was very suspicious. In this category, there was a method `switchMethodForCodeZipper` whose implementation replaced the `methodSignatureForSelector` and `forwardInvocation` methods of `QQmethodSignatureForSelector` and `QQforwardInvocation` methods.
 
 
 ```objective-c
@@ -595,7 +600,7 @@ Then we use below LLDB command to set breakpoint on this method:
 br s -n "-[TCWebViewKit open]"
 ```
 
-> `br s` is the abbreviation for `breakpoint set`, `-n` represents set the breakpoint according to the method name afte it, which has the same behavior with symbolic breakpoint, `br s -F` can also set the breakpoint.  `b -[TCWebViewKit open]` also works here, but `b` here is the abbreviation of `_regexp-break`, which uses  regular expression to set the breakpoint. In the end, we can also set breakpoint on memory address like `br s -a 0x000000010940b24e`, which can help to debug block if the address of the block is available.
+> `br s` is the abbreviation for `breakpoint set`, `-n` represents set the breakpoint according to the method name after it, which has the same behavior with symbolic breakpoint, `br s -F` can also set the breakpoint.  `b -[TCWebViewKit open]` also works here, but `b` here is the abbreviation of `_regexp-break`, which uses  regular expression to set the breakpoint. In the end, we can also set breakpoint on memory address like `br s -a 0x000000010940b24e`, which can help to debug block if the address of the block is available.
 
 By now the breakpoint is set successfully.
 
@@ -604,7 +609,7 @@ By now the breakpoint is set successfully.
 Breakpoint 34: where = AADebug`-[TCWebViewKit open], address = 0x0000000103157f7d
 ```
 
-When app is going to lanuch the web authentication page, the project is stopped on this breakpoint. Refer to below:
+When app is going to launch the web authentication page, the project is stopped on this breakpoint. Refer to below:
 
 <p align="center">
 
@@ -612,9 +617,9 @@ When app is going to lanuch the web authentication page, the project is stopped 
 
 </p>
 
-> This screenshot is captured when app runing on simulator, so the assembly code is based on X64. If you are using the iPhone device, the assembly code should be ARM. But the analysis method is the same for them, please notice it.
+> This screenshot is captured when app running on simulator, so the assembly code is based on X64. If you are using the iPhone device, the assembly code should be ARM. But the analysis method is the same for them, please notice it.
 
-Set a breakpoint on Line 96, this assembly code is the `setRequestURLStr` method invocation, then print the content of `rbx` register, then we can observer that the `TCWebViewController` instance is saved in this register.
+Set a breakpoint on Line 96, this assembly code is the `setRequestURLStr` method invocation, then print the content of `rbx` register, then we can observe that the `TCWebViewController` instance is saved in this register.
 
 <p align="center">
 
@@ -663,7 +668,7 @@ After the breakpoint is set, continue the program execution, the app is crashed.
 
 </p>
 
-`___forwarding___` function contains the whole implementation of message forwarding mechanism, the decompilation code is selected from [Objective-C 消息发送与转发机制原理](http://yulingtianxia.com/blog/2016/06/15/Objective-C-Message-Sending-and-Forwarding/). In this article, there is a judgement which should be incorrect between `forwarding` and `receiver` when calling `forwardingTargetForSelector` method. Here it should be a judegement between `forwardingTarget` and `receiver`. Refer to code below:
+`___forwarding___` function contains the whole implementation of message forwarding mechanism, the decompilation code is selected from [Objective-C 消息发送与转发机制原理](http://yulingtianxia.com/blog/2016/06/15/Objective-C-Message-Sending-and-Forwarding/). In this article, there is a judgement which should be incorrect between `forwarding` and `receiver` when calling `forwardingTargetForSelector` method. Here it should be a judgement between `forwardingTarget` and `receiver`. Refer to code below:
 
 ```
 int __forwarding__(void *frameStackPointer, int isStret) {
@@ -753,7 +758,7 @@ int __forwarding__(void *frameStackPointer, int isStret) {
 }
 ```
 Basically, we can have a clear understanding through reading the decompilation code: 
- First invoke `forwardingTargetForSelector` method during the message forwarding process to get the replacement receiver, which is also called Fast Forwarding phase. If the `forwardingTarget` returns nil or return the same receiver, the message forwarding turns into Regular Forwarding phase. Basically, invoking `methodSignatureForSelector` method to get the method signature, then using it with `frameStackPointer` to instantiate `invocation` object. Then call `forwardInvocation:` method of the `receiver`, and pass the previous `invocation`object as an argument. In the end if `methodSignatureForSelector` mehtod is not implemented and the `selector` is already registered in runtime system, `doesNotRecognizeSelector:` will be invoked to throw an error.
+ First invoke `forwardingTargetForSelector` method during the message forwarding process to get the replacement receiver, which is also called Fast Forwarding phase. If the `forwardingTarget` returns nil or return the same receiver, the message forwarding turns into Regular Forwarding phase. Basically, invoking `methodSignatureForSelector` method to get the method signature, then using it with `frameStackPointer` to instantiate `invocation` object. Then call `forwardInvocation:` method of the `receiver`, and pass the previous `invocation`object as an argument. In the end if `methodSignatureForSelector` method is not implemented and the `selector` is already registered in runtime system, `doesNotRecognizeSelector:` will be invoked to throw an error.
 
 Scrutinizing the `___forwarding___` from the crash stack trace, we can notice that it's called as the second path among the whole message forwarding path, which means `NSInvocation` object is invoked when `forwardInvocation` is called.
 
@@ -765,7 +770,7 @@ Scrutinizing the `___forwarding___` from the crash stack trace, we can notice th
 
 </p>
 
-And which method is executed when `forwardInvocation` is called? From the stack trace, we can see a method named `__ASPECTS_ARE_BEING_CALLED__` is executed. Look over this method through the whole project, we finally find out `forwardInvocation` is hooked by `Aspects` framework.
+And which method is executed when `forwardInvocation` is called? From the stack trace, we can see a method named `__ASPECTS_ARE_BEING_CALLED__` is executed. Look over this method of the whole project, we finally find out `forwardInvocation` is hooked by `Aspects` framework.
 
 ```objective-c
 static void aspect_swizzleForwardInvocation(Class klass) {
@@ -833,7 +838,7 @@ static void __ASPECTS_ARE_BEING_CALLED__(__unsafe_unretained NSObject *self, SEL
 }
 ```
 
-Since `TCWebViewController` is a private class in Tencent SDK, it's unlikely been hooked by other class directly. But it's possible its superclass is hooked which can also affect this class. With this conjecture, we kept digging. Finially, the answer surfaced! By removing or commenting the code that hooking `UIViewController`, the app didn't crash when login via QQ. So far, we were definitely sure the crash was involved by `Aspects` framework.
+Since `TCWebViewController` is a private class of Tencent SDK, it's unlikely been hooked by other class directly. But it's possible its superclass is hooked which can also affect this class. With this conjecture, we kept digging. Finially, the answer surfaced! By removing or commenting the code that hooking `UIViewController`, the app didn't crash when login via QQ. So far, we were definitely sure the crash was involved by `Aspects` framework.
 
 <p align="center">
 
@@ -841,16 +846,16 @@ Since `TCWebViewController` is a private class in Tencent SDK, it's unlikely bee
 
 </p>
 
-`doesNotRecognizeSelector:` error is throwed by `__ASPECTS_ARE_BEING_CALLED__` method which is used to replace the IMP of `forwardInvocation:` method by **Aspects**. The implementation of `__ASPECTS_ARE_BEING_CALLED__` method has the corresponding time slice for before, instead and after the hooking in `Aspect`. Among above code, `aliasSelector` is a SEL which is handled by **Aspects**, like `aspects__setRequestURLStr:`.
+`doesNotRecognizeSelector:` error is thrown by `__ASPECTS_ARE_BEING_CALLED__` method which is used to replace the IMP of `forwardInvocation:` method by **Aspects**. The implementation of `__ASPECTS_ARE_BEING_CALLED__` method has the corresponding time slice for before, instead and after the hooking in `Aspect`. Among above code, `aliasSelector` is a SEL which is handled by **Aspects**, like `aspects__setRequestURLStr:`.
 
-In Instead hooks part, invocation.target will be checked if it can responde to aliasSelector. If subclass cannot respond, the superclass will be checked,  the superclass's superclass, until root class. Since the aliasSelector cannot be responded, 
-respondsToAlias is false. Then originalSelector is assigned to be a selector of invocation. Next objc_msgSend invokes the invocation to call the original SEL. Since TCWebViewController cannot respond the `originalSelector:setRequestURLStr:` method, it finnally runs to **ASPECTS_ARE_BEING_CALLED** method in Aspects and doesNotRecognizeSelector: method is threw accordingly, which is the root cause of the crash we talked about in the beginning of this article.
+In Instead hooks part, invocation.target will be checked if it can respond to aliasSelector. If subclass cannot respond, the superclass will be checked,  the superclass's superclass, until root class. Since the aliasSelector cannot be responded, 
+respondsToAlias is false. Then originalSelector is assigned to be a selector of invocation. Next objc_msgSend invokes the invocation to call the original SEL. Since TCWebViewController cannot respond the `originalSelector:setRequestURLStr:` method, it finally runs to **ASPECTS_ARE_BEING_CALLED** method of Aspects and doesNotRecognizeSelector: method is threw accordingly, which is the root cause of the crash we talked about in the beginning of this article.
 
-Some careful reader might already realize the crash could be involved with Aspects, since seeing line **__ASPECTS_ARE_BEING_CALLED__** at line 3 of the crash stack trace. The reason I still listed all the attempts here is that I hope you can learn how to locate a problem from a third-part framework without source code through static analysis and dynamic analysis. Hope the tricks and technology mentioned in this artice can be helpful for you.
+Some careful reader might already realize the crash could be involved with Aspects, since seeing line **__ASPECTS_ARE_BEING_CALLED__** at line 3 of the crash stack trace. The reason I still listed all the attempts here is that I hope you can learn how to locate a problem from a third-part framework without source code through static analysis and dynamic analysis. Hope the tricks and technology mentioned in this article can be helpful for you.
 
 #### Solution
 
-There are two available ways to fix the crash. One is hooking the method in **Aspects** which is less invasive, for example Method Swizzling, then the setter creation during the message forwarding process for **TencentOpenAPI** would not be interrupted. Another is replace `forwardInvocation:` with ours implementation, if both `aliasSelector` and ``originalSelector cannot response to the message forwarding, we can forward the message forwarding path back into the original path. Refer to the code below:
+There are two available ways to fix the crash. One is hooking the method of **Aspects** which is less invasive, for example Method Swizzling, then the setter creation during the message forwarding process for **TencentOpenAPI** would not be interrupted. Another is replace `forwardInvocation:` with ours implementation, if both `aliasSelector` and ``originalSelector cannot response to the message forwarding, we can forward the message forwarding path back into the original path. Refer to the code below:
 
 ```objective-c
      if (!respondsToAlias) {
@@ -865,12 +870,13 @@ In fact, **Aspects** has conflicts with **JSPatch**. Since the implementation of
 
 #### A perfect crush between Aspects and TencentOpenAPI
 
-The root cause of this crash is the conflict between **Aspects** and **TencentOpenAPI** frameworks. The life cycle method in `UIViewController` class is hooked by Aspects, and the `forwardInvocation` method is replaced in the Aspects's implementation. Also, because of the superclass of `TCWebViewController` is `UIViewController` class. As a result, `QQforwardInvocation` method in `TCWebViewController` class is hooked by Aspects too. That leads to the message forwarding proccess failed, thus, the creation of getter and setter fails too.
+The root cause of this crash is the conflict between **Aspects** and **TencentOpenAPI** frameworks. The life cycle method of `UIViewController` class is hooked by Aspects, and the `forwardInvocation` method is replaced with the Aspects's implementation. Also, because of the superclass of `TCWebViewController` is `UIViewController` class. As a result, `QQforwardInvocation` method of `TCWebViewController` class is hooked by Aspects too. That leads to the message forwarding process failed, thus, the creation of getter and setter fails too.
 
 This case tells us, we should not only learn how to use a third-part framework, but also need to look into the mechanism of it. Only then, we can easily to locate the problem we meet during our work.
 
 ## Summary
-We introuduce different kinds of tips in this article, but we hope you can also master a way of thinking when debugging. Skills are easy to be learned, but the way you think when resolving problem is not easy to be formed. It takes time and practice. Besides kinds of debugging techiniques, you also have to have a good sense of problem analysis, then the problem will be handy for you.
+
+We introduce different kinds of tips in this article, but we hope you can also master a way of thinking when debugging. Skills are easy to be learned, but the way you think when resolving problem is not easy to be formed. It takes time and practice. Besides kinds of debugging techniques, you also have to have a good sense of problem analysis, then the problem will be handy for you.
 
 ## Reference Material
 
@@ -890,7 +896,7 @@ We introuduce different kinds of tips in this article, but we hope you can also 
 
 ## Acknowledgements
 
-Special thanks to below readers, I really appreciate your suppport and valuable suggestions. 
+Special thanks to below readers, I really appreciate your support and valuable suggestions. 
 
 * [ZenonHuang](https://github.com/ZenonHuang)
 
