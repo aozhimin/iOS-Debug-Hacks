@@ -26,9 +26,9 @@ Here are the steps of a real debugging:
 
 Among above steps, the most important step is the first step: find out the problem. Apparently, it's a prerequisite of other steps.
 
-Research shows the time experienced programmers spend on debugging to locate the same set of defects is about one twentieth of inexperienced programmers. That means debugging experience makes an enormous difference on programming efficiency. We have lots of books on software design, unfortunately, rare of them have introduction about debugging, even the courses in school.
+Research shows the time experienced programmers spend on debugging to locate the same set of defects is about one twentieth of inexperienced programmers. That means debugging experience makes an enormous difference in programming efficiency. We have lots of books on software design, unfortunately, rare of them have introduction about debugging, even the courses in school.
 
-As the debugger improving over years, the programmers' coding style is changed thoroughly. But still，a good debugger cannot replace good debugging thought. In contrast, excellent debugging thought is not enough without good debugger. The perfect thing is we have both of them.
+As the debugger improving over the years, the programmers' coding style is changed thoroughly. Of course, the debugger can not replace the good thinking, thinking can not replace the excellent debugger, the most perfect combination is excellent debugger with good thinking.
 
 The following graph is the nine debugging rules described in book <Debugging: The 9 Indispensable Rules for Finding Even the Most Elusive Software and Hardware Problems>.
 
@@ -40,15 +40,15 @@ The following graph is the nine debugging rules described in book <Debugging: Th
 
 ## Assembly Language
 
-> Although assembly language is not compulsory for iOS developers, learning about it would be extremely useful, especially when debugging a system framework or a third-party framework.
+> Although as an iOS programmer, most of the time in the work will not deal with the assembly language, but understand the assembly is still very helpful, especially when debugging a system framework or a third-party framework without the source code.
 
-Asssembly Language is a low-level machine-oriented programming language, which can be understood as a family of variety machine instructions set of CPU. Programmer can use assembly language to control the computer hardware system directly. Systems developed by assembly language have many merits, like fast execution speed and less memory occupied.
+Asssembly Language is a low-level machine-oriented programming language, which can be thought of as a collection of mnemonics for machine instructions for various CPUs. Programmers can use assembly language to control the computer hardware system directly. and the program written in assembly language have many merits, like fast execution speed and less memory occupied.
 
-So far, two major architectures are widely used on Apple platform, x86 and ARM. And on mobile devices, ARM, which is based on a reduced instruction set computing (RISC) architecture, is used because its low power cost. But on laptop platforms like Mac OS, x86 architecture is used. The Apps installed on iOS simulators is actually running as a Mac OS App inside the simulator, which means simulator is working like a container. Thus, when debugging based on simulators, the **x86** architecture is used. And that's what we are going to focus in this article.
+So far, two major architectures are widely used on the Apple platform, x86 and ARM. In the mobile device using the ARM assembly language, which is mainly because the ARM is a reduced instruction set computing (RISC) architecture, with low power consumption advantage. While the desktop platform like Mac OS, x86 architecture is used. The Apps installed on iOS simulators is actually running as a Mac OS App inside the simulator, which means simulator is working like a container. Since our case was debugged in the iOS simulators, the main research goal is **x86** assembly language.
 
 ### AT&T and Intel
 
-X86 assembly language evolves into two branches: Intel (orignially used in the document of X86 platform) and AT&T. Intel plays a leading way on MS-DOS and Windows platforms. And AT&T is widely used in UNIX family. There is a huge difference on syntax between Intel and AT&T, like variable, constant, the access of registers, indirect addressing and offset. Although their syntax difference is enormous, the hardware system is the same which means one of them can be migrated to the other seamlessly. Since AT&T assembly language is used on Xcode, we will focus on **AT&T** in below part.
+x86 assembly language evolves into two syntax branches: Intel (orignially used in the x86 platform documentation) and AT&T. Intel dominates the MS-DOS and Windows family, while AT&T is common in UNIX family. There is a huge difference on syntax between Intel and AT&T, like variable, constant, the access of registers, indirect addressing and offset. Although their syntax difference is enormous, the hardware system is the same which means one of them can be migrated to the other seamlessly. Since AT&T assembly language is used on Xcode, we will focus on **AT&T** in below part.
 
 > Please notice that Intel syntax is used on 
 the disassembly tools of Hopper Disassemble and IDA Pro.
